@@ -37,9 +37,14 @@ async function getKV(key){
   const v = await _req('kv', 'readonly', st => st.get(key));
   return v === undefined ? null : v;
 }
-async function setKV(key, val){
-  if (_useLS) { localStorage.setItem(LS_KV + key, JSON.stringify(val)); return; }
-  await _req('kv', 'readwrite', st => st.put(val, key));
+async function setKV(key, val, fromSync){
+  if (_useLS) localStorage.setItem(LS_KV + key, JSON.stringify(val));
+  else await _req('kv', 'readwrite', st => st.put(val, key));
+  if (!fromSync && (key === 'routine' || key === 'settings')) {
+    // sello de versión para resolver conflictos al sincronizar
+    await setKV('kvStamp', Date.now(), true);
+    if (window.Sync) Sync.onLocalKV();
+  }
 }
 
 function _lsSessions(){ try { return JSON.parse(localStorage.getItem(LS_SESS)) || {}; } catch (e) { return {}; } }
@@ -53,13 +58,16 @@ async function getSession(id){
   const v = await _req('sessions', 'readonly', st => st.get(id));
   return v === undefined ? null : v;
 }
-async function putSession(s){
-  if (_useLS) { const m = _lsSessions(); m[s.id] = s; localStorage.setItem(LS_SESS, JSON.stringify(m)); return; }
-  await _req('sessions', 'readwrite', st => st.put(s));
+async function putSession(s, fromSync){
+  if (!fromSync) s.updatedAt = Date.now();
+  if (_useLS) { const m = _lsSessions(); m[s.id] = s; localStorage.setItem(LS_SESS, JSON.stringify(m)); }
+  else await _req('sessions', 'readwrite', st => st.put(s));
+  if (!fromSync && window.Sync) Sync.onLocalPut(s);
 }
-async function deleteSession(id){
-  if (_useLS) { const m = _lsSessions(); delete m[id]; localStorage.setItem(LS_SESS, JSON.stringify(m)); return; }
-  await _req('sessions', 'readwrite', st => st.delete(id));
+async function deleteSession(id, fromSync){
+  if (_useLS) { const m = _lsSessions(); delete m[id]; localStorage.setItem(LS_SESS, JSON.stringify(m)); }
+  else await _req('sessions', 'readwrite', st => st.delete(id));
+  if (!fromSync && window.Sync) Sync.onLocalDelete(id);
 }
 async function wipeAll(){
   Object.keys(localStorage).filter(k => k.startsWith('gym.')).forEach(k => localStorage.removeItem(k));

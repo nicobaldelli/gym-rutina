@@ -1,6 +1,6 @@
 /* Service worker: cache-first para funcionar 100% offline.
    Al actualizar la app, subí la versión de CACHE para invalidar lo viejo. */
-const CACHE = 'gym-cache-v2';
+const CACHE = 'gym-cache-v3';
 const ASSETS = [
   './',
   './index.html',

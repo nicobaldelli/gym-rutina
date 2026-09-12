@@ -39,6 +39,14 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 #nav a.on{color:var(--accent)}
 
 .session-head{margin:8px 4px}
+.prog-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.prog-track{flex:1;height:8px;background:var(--card2);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:var(--ok);border-radius:99px;transition:width .25s}
+.prog-txt{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.card-done{border-color:rgba(61,220,133,.45)}
+.card-done .card-title{color:var(--ok)}
+.stretch-list{margin:10px 0;padding-left:20px}
+.stretch-list li{margin:8px 0;font-size:15px}
 .back{display:inline-block;color:var(--muted);font-size:15px;margin-bottom:4px}
 .date-row{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:15px;margin-top:6px}
 input,select{font:inherit}

@@ -61,7 +61,7 @@ y abrí `http://localhost:8080` en el navegador.
 
 ## Uso rápido
 
-- **Inicio**: tocá un día → se crea la sesión con la fecha de hoy (editable). Cargá peso y reps por serie; todo se autoguarda al instante. El botón ⏱ de cada serie arranca el descanso (1:40 por defecto, configurable). En gris ves lo que levantaste la última vez.
+- **Inicio**: tocá un día → se crea la sesión con la fecha de hoy (editable) y se abre el **hub del día**: elegís el ejercicio que vas a hacer (de a uno), lo completás en su propia pantalla y lo marcás con "✓ Terminé este ejercicio". Volvés al hub con la barra de progreso, los pendientes y los hechos (tocá uno hecho para revisarlo o corregirlo; también podés desmarcarlo). Al terminar todos aparece la elongación y, cuando la marcás (o la saltás), confirmás la sesión. El botón ⏱ de cada serie arranca el descanso (1:40 por defecto, configurable), en gris ves lo que levantaste la última vez, y todo se autoguarda al instante. Si cortás antes, "Finalizar ahora" guarda igual.
 - **Historial**: ver, editar o borrar sesiones pasadas.
 - **Progreso**: arriba, stats del período (este mes / este año / todo): sesiones, series, volumen, **balance entre días** (para ver si hiciste más Día 1 que Día 3 y compensar) y sesiones por mes/año. Abajo, la evolución por ejercicio del peso máximo y del volumen (peso × reps).
 - **Rutina**: agregar, borrar, reordenar y editar ejercicios; importar/exportar.

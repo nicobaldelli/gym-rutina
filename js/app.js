@@ -73,10 +73,10 @@ function download(name, content, type){
 // ---- ruteo ----
 function route(){
   const parts = (location.hash || '#/home').split('/');
-  const view = parts[1] || 'home', a = parts[2], b = parts[3];
+  const view = parts[1] || 'home', a = parts[2], b = parts[3], c = parts[4];
   switch (view) {
     case 'home': return renderHome();
-    case 'session': return renderSession(a);
+    case 'session': return b === 'ex' ? renderSessionExercise(a, c) : renderSession(a);
     case 'history': return a ? renderHistoryDetail(a) : renderHistory();
     case 'progress': return renderProgress();
     case 'routine': return renderRoutine();
@@ -119,10 +119,12 @@ async function startSession(dayId){
     date: todayISO(),
     startedAt: Date.now(),
     status: 'open',
+    stretchesDone: false,
     entries: day.exercises.map(x => ({
       exerciseId: x.id,
       name: x.name,
       type: x.type || 'reps',
+      done: false,
       sets: Array.from({ length: x.sets || 3 }, () => ({ w: null, r: null }))
     }))
   };
@@ -153,61 +155,163 @@ function setRowHTML(ei, si, t){
   </div>`;
 }
 
+function setsSummary(en){
+  const sets = en.sets.filter(t => t.w != null || t.r != null);
+  if (!sets.length) return '';
+  return sets.map(t => (t.w != null ? fmtWeight(t.w, false) : '—') + '×' + (t.r != null ? t.r : '—')).join(' · ') + ' ' + settings.unit;
+}
+function prevSummary(prev){
+  return prev.sets.map(t => (t.w != null ? fmtWeight(t.w, false) : '—') + '×' + (t.r != null ? t.r : '—')).join(' · ');
+}
+
+/* Hub del día: progreso, ejercicios pendientes (elegís el próximo), hechos,
+   elongación y cierre. Cada ejercicio se completa de a uno en su propia vista. */
 async function renderSession(id){
   setNav('home');
   const s = await getSession(id);
   if (!s) { toast('No se encontró la sesión'); location.hash = '#/home'; return; }
   const day = routine.days.find(d => d.id === s.dayId);
   const others = (await getAllSessions()).filter(x => x.id !== s.id).sort(byDateDesc);
-  const backHref = s.status === 'done' ? '#/history/' + s.id : '#/home';
+  const isDone = s.status === 'done';
+  const total = s.entries.length;
+  const doneN = s.entries.filter(en => en.done).length;
+  const backHref = isDone ? '#/history/' + s.id : '#/home';
 
   let html = `<div class="session-head">
     <a class="back" href="${backHref}">‹ Volver</a>
     <h2>${esc(s.dayName)}</h2>
     <label class="date-row">Fecha <input type="date" id="sessDate" value="${esc(s.date)}"></label>
+    ${!isDone ? `<div class="prog-row"><div class="prog-track"><div class="prog-fill" style="width:${total ? Math.round(doneN / total * 100) : 0}%"></div></div><span class="prog-txt">${doneN}/${total}</span></div>` : ''}
   </div>`;
 
-  s.entries.forEach((en, ei) => {
-    const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
-    const prev = findPrev(others, en.name);
-    const isTime = en.type === 'time';
-    html += `<section class="exercise card">
-      <div class="ex-head">
-        <div>
-          <div class="ex-name">${esc(en.name)}</div>
-          ${meta ? `<div class="ex-meta">${esc(meta.group)}${meta.grip ? ' · ' + esc(meta.grip) : ''}</div>
-          <div class="ex-meta">${esc(meta.sets + ' x ' + meta.repsTarget)} · descanso ${fmtSecs(meta.restSec || settings.restSec)}</div>` : ''}
-        </div>
-        ${meta && meta.url ? `<a class="demo" href="${esc(meta.url)}" target="_blank" rel="noopener">Ver demo ↗</a>` : ''}
-      </div>`;
-    if (prev) {
-      html += `<div class="prev">Última vez (${fmtDate(prev.date)}): ${prev.sets.map(t => (t.w != null ? fmtWeight(t.w, false) : '—') + '×' + (t.r != null ? t.r : '—')).join(' · ')} ${settings.unit}</div>`;
-    }
-    html += `<div class="sets" data-ei="${ei}">
-      <div class="set-row set-row-head"><span>#</span><span>Peso (${settings.unit})</span><span>${isTime ? 'Seg' : 'Reps'}</span><span></span></div>`;
-    en.sets.forEach((t, si) => { html += setRowHTML(ei, si, t); });
-    html += `</div>
-      <button class="btn-ghost add-set" data-ei="${ei}">+ serie</button>
-    </section>`;
-  });
+  const pend = [], ready = [];
+  s.entries.forEach((en, ei) => ((en.done || isDone) ? ready : pend).push([en, ei]));
 
-  if (day && day.stretches && day.stretches.length) {
-    html += `<details class="card stretches"><summary>🧘 Elongación post-entreno</summary><ul>` +
-      day.stretches.map(x => `<li>${esc(x.name)}${x.url ? ` — <a href="${esc(x.url)}" target="_blank" rel="noopener">ver ↗</a>` : ''}</li>`).join('') +
-      `</ul></details>`;
+  if (pend.length) {
+    html += `<div class="section-label">Elegí el próximo ejercicio · ${pend.length} restante${pend.length === 1 ? '' : 's'}</div>`;
+    for (const [en, ei] of pend) {
+      const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
+      const cur = setsSummary(en);
+      const prev = cur ? null : findPrev(others, en.name);
+      const sub = cur
+        ? 'En curso: ' + cur
+        : (meta ? meta.sets + ' x ' + meta.repsTarget : '') + (prev ? ' · últ: ' + prevSummary(prev) : '');
+      html += `<a class="card card-row" href="#/session/${s.id}/ex/${ei}">
+        <div><div class="card-title">${esc(en.name)}</div><div class="card-sub">${esc(sub)}</div></div>
+        <div class="chev">›</div></a>`;
+    }
   }
 
-  html += `<div class="session-actions">
-    <button id="finishBtn" class="btn-primary">${s.status === 'done' ? 'Guardar cambios' : 'Finalizar sesión'}</button>
-    ${s.status === 'open' ? '<button id="discardBtn" class="btn-danger">Descartar sesión</button>' : ''}
+  if (ready.length) {
+    html += `<div class="section-label">${isDone ? 'Ejercicios (tocá para editar)' : 'Hechos ✓'}</div>`;
+    for (const [en, ei] of ready) {
+      html += `<a class="card card-row card-done" href="#/session/${s.id}/ex/${ei}">
+        <div><div class="card-title">✓ ${esc(en.name)}</div><div class="card-sub">${esc(setsSummary(en) || 'Sin datos')}</div></div>
+        <div class="chev">›</div></a>`;
+    }
+  }
+
+  const stretches = (day && day.stretches) || [];
+  if (!isDone) {
+    if (!pend.length) {
+      if (stretches.length && !s.stretchesDone) {
+        html += `<div class="card"><div class="ex-name">🧘 Elongación post-entreno</div><ul class="stretch-list">` +
+          stretches.map(x => `<li>${esc(x.name)}${x.url ? ` — <a href="${esc(x.url)}" target="_blank" rel="noopener">ver ↗</a>` : ''}</li>`).join('') +
+          `</ul>
+          <button id="stretchDone" class="btn-primary">✓ Terminé la elongación</button>
+          <button id="stretchSkip" class="btn-ghost">Saltar elongación por hoy</button></div>`;
+      } else {
+        html += `<div class="card"><div class="ex-name">🎉 ¡Día completo!</div>
+          <div class="card-sub">${s.stretchesDone ? 'Ejercicios y elongación listos.' : 'Todos los ejercicios listos.'} Confirmá para guardar la sesión.</div>
+          <button id="finishBtn" class="btn-primary">💪 Finalizar y guardar sesión</button></div>`;
+      }
+    }
+    html += `<div class="session-actions">
+      ${pend.length ? `<button id="finishEarly" class="btn-ghost">Finalizar ahora (faltan ${pend.length})</button>` : ''}
+      <button id="discardBtn" class="btn-danger">Descartar sesión</button>
+    </div>`;
+  } else {
+    html += `<div class="session-actions"><div class="card-sub" style="text-align:center">Los cambios se guardan solos al editar cada ejercicio.</div></div>`;
+  }
+
+  const root = setView(html);
+  const q = sel => root.querySelector(sel);
+  q('#sessDate').addEventListener('change', async e => {
+    if (e.target.value) { s.date = e.target.value; await putSession(s); }
+  });
+  const markStretch = async msg => {
+    s.stretchesDone = true;
+    await putSession(s);
+    if (msg) toast(msg);
+    renderSession(id);
+  };
+  if (q('#stretchDone')) q('#stretchDone').addEventListener('click', () => markStretch('Elongación lista 🧘'));
+  if (q('#stretchSkip')) q('#stretchSkip').addEventListener('click', () => markStretch());
+  const finish = async () => {
+    s.status = 'done'; s.finishedAt = Date.now();
+    await putSession(s);
+    toast('Sesión guardada 💪');
+    location.hash = '#/home';
+  };
+  if (q('#finishBtn')) q('#finishBtn').addEventListener('click', finish);
+  if (q('#finishEarly')) q('#finishEarly').addEventListener('click', () => {
+    const left = s.entries.filter(en => !en.done).length;
+    if (confirm(`Te quedan ${left} ejercicio${left === 1 ? '' : 's'} sin marcar. ¿Finalizar la sesión igual?`)) finish();
+  });
+  if (q('#discardBtn')) q('#discardBtn').addEventListener('click', async () => {
+    if (confirm('¿Descartar esta sesión y sus datos?')) {
+      await deleteSession(s.id);
+      toast('Sesión descartada');
+      location.hash = '#/home';
+    }
+  });
+}
+
+/* Vista de un ejercicio: cargás las series, descansás con el timer y lo marcás
+   como terminado para volver al hub del día. Todo se autoguarda. */
+async function renderSessionExercise(id, eiRaw){
+  setNav('home');
+  const s = await getSession(id);
+  if (!s) { toast('No se encontró la sesión'); location.hash = '#/home'; return; }
+  const ei = parseInt(eiRaw, 10);
+  const en = s.entries[ei];
+  if (!en) { location.hash = '#/session/' + s.id; return; }
+  const day = routine.days.find(d => d.id === s.dayId);
+  const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
+  const others = (await getAllSessions()).filter(x => x.id !== s.id).sort(byDateDesc);
+  const prev = findPrev(others, en.name);
+  const isTime = en.type === 'time';
+  const isDone = s.status === 'done';
+  const doneN = s.entries.filter(x => x.done).length;
+
+  let html = `<div class="session-head">
+    <a class="back" href="#/session/${s.id}">‹ Rutina del día${isDone ? '' : ` (${doneN}/${s.entries.length})`}</a>
+    <h2>${esc(en.name)}</h2>
+  </div>
+  <section class="exercise card">
+    <div class="ex-head">
+      <div>
+        ${meta ? `<div class="ex-meta">${esc(meta.group)}${meta.grip ? ' · ' + esc(meta.grip) : ''}</div>
+        <div class="ex-meta">Objetivo: ${esc(meta.sets + ' x ' + meta.repsTarget)} · descanso ${fmtSecs(meta.restSec || settings.restSec)}</div>` : ''}
+      </div>
+      ${meta && meta.url ? `<a class="demo" href="${esc(meta.url)}" target="_blank" rel="noopener">Ver demo ↗</a>` : ''}
+    </div>
+    ${prev ? `<div class="prev">Última vez (${fmtDate(prev.date)}): ${prevSummary(prev)} ${settings.unit}</div>` : ''}
+    <div class="sets" data-ei="${ei}">
+      <div class="set-row set-row-head"><span>#</span><span>Peso (${settings.unit})</span><span>${isTime ? 'Seg' : 'Reps'}</span><span></span></div>`;
+  en.sets.forEach((t, si) => { html += setRowHTML(ei, si, t); });
+  html += `</div>
+    <button class="btn-ghost add-set">+ serie</button>
+  </section>
+  <div class="session-actions">
+    ${!isDone && !en.done ? `<button id="exDone" class="btn-primary">✓ Terminé este ejercicio</button>` : ''}
+    ${!isDone && en.done ? `<a class="btn-primary" href="#/session/${s.id}">‹ Volver a la rutina del día</a>
+      <button id="exUndone" class="btn-ghost">↩ Marcar como pendiente</button>` : ''}
+    ${isDone ? `<a class="btn-primary" href="#/session/${s.id}">‹ Volver</a>` : ''}
     <div class="savehint" id="saveHint"></div>
   </div>`;
 
   const root = setView(html);
-  bindSession(root, s, day);
-}
-
-function bindSession(root, s, day){
   const hint = root.querySelector('#saveHint');
   const save = () => {
     clearTimeout(saveTimer);
@@ -220,14 +324,10 @@ function bindSession(root, s, day){
     }, 300);
   };
 
-  root.querySelector('#sessDate').addEventListener('change', e => {
-    if (e.target.value) { s.date = e.target.value; save(); }
-  });
-
   root.addEventListener('input', e => {
     const row = e.target.closest('.set-row');
     if (!row || row.classList.contains('set-row-head')) return;
-    const t = s.entries[+row.dataset.ei].sets[+row.dataset.si];
+    const t = en.sets[+row.dataset.si];
     if (e.target.classList.contains('in-w')) t.w = displayToKg(e.target.value);
     if (e.target.classList.contains('in-r')) {
       const n = parseFloat(e.target.value);
@@ -237,39 +337,22 @@ function bindSession(root, s, day){
   });
 
   root.addEventListener('click', async e => {
-    const tbtn = e.target.closest('.btn-timer');
-    if (tbtn) {
-      const en = s.entries[+tbtn.closest('.set-row').dataset.ei];
-      const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
+    if (e.target.closest('.btn-timer')) {
       Timer.start((meta && meta.restSec) || settings.restSec);
       return;
     }
-    const add = e.target.closest('.add-set');
-    if (add) {
-      const ei = +add.dataset.ei;
-      const en = s.entries[ei];
+    if (e.target.closest('.add-set')) {
       en.sets.push({ w: null, r: null });
-      root.querySelector(`.sets[data-ei="${ei}"]`)
-        .insertAdjacentHTML('beforeend', setRowHTML(ei, en.sets.length - 1, en.sets[en.sets.length - 1]));
+      root.querySelector('.sets').insertAdjacentHTML('beforeend', setRowHTML(ei, en.sets.length - 1, en.sets[en.sets.length - 1]));
       save();
       return;
     }
-    if (e.target.id === 'finishBtn') {
-      const wasDone = s.status === 'done';
-      if (!wasDone) { s.status = 'done'; s.finishedAt = Date.now(); }
+    if (e.target.id === 'exDone' || e.target.id === 'exUndone') {
+      en.done = e.target.id === 'exDone';
       clearTimeout(saveTimer);
       await putSession(s);
-      toast(wasDone ? 'Cambios guardados ✓' : 'Sesión guardada 💪');
-      location.hash = wasDone ? '#/history/' + s.id : '#/home';
-      return;
-    }
-    if (e.target.id === 'discardBtn') {
-      if (confirm('¿Descartar esta sesión y sus datos?')) {
-        clearTimeout(saveTimer);
-        await deleteSession(s.id);
-        toast('Sesión descartada');
-        location.hash = '#/home';
-      }
+      if (en.done) toast('Ejercicio listo 💪');
+      location.hash = '#/session/' + s.id;
     }
   });
 }

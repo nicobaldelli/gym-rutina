@@ -328,6 +328,89 @@ async function renderHistoryDetail(id){
   });
 }
 
+// ---- stats del período (mes / año / todo) ----
+let statsPeriod = 'month';
+const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function statsHTML(sessions){
+  const now = todayISO();
+  const inPeriod =
+    statsPeriod === 'month' ? s => s.date.slice(0, 7) === now.slice(0, 7) :
+    statsPeriod === 'year' ? s => s.date.slice(0, 4) === now.slice(0, 4) :
+    () => true;
+  const label = statsPeriod === 'month' ? 'este mes' : statsPeriod === 'year' ? 'este año' : 'histórico';
+  const ss = sessions.filter(inPeriod);
+  let sets = 0, vol = 0;
+  ss.forEach(s => { sets += countSets(s); vol += totalVolume(s); });
+
+  let html = `<div class="seg stats-seg">
+    <button class="seg-btn ${statsPeriod === 'month' ? 'on' : ''}" data-p="month">Este mes</button>
+    <button class="seg-btn ${statsPeriod === 'year' ? 'on' : ''}" data-p="year">Este año</button>
+    <button class="seg-btn ${statsPeriod === 'all' ? 'on' : ''}" data-p="all">Todo</button>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-num">${ss.length}</div><div class="stat-lbl">sesiones</div></div>
+    <div class="stat-box"><div class="stat-num">${sets}</div><div class="stat-lbl">series</div></div>
+    <div class="stat-box"><div class="stat-num">${fmtTick(kgToDisplay(vol))}</div><div class="stat-lbl">volumen (${settings.unit})</div></div>
+  </div>`;
+
+  // balance entre días: cuántas veces hiciste cada día de la rutina en el período
+  const cnt = new Map();
+  routine.days.forEach(d => cnt.set(d.id, { name: d.name, n: 0, last: '' }));
+  ss.forEach(s => {
+    let e = cnt.get(s.dayId);
+    if (!e) { // el día ya no existe en la rutina: agrupamos por nombre
+      for (const v of cnt.values()) if (v.name === s.dayName) { e = v; break; }
+      if (!e) { e = { name: s.dayName, n: 0, last: '' }; cnt.set('x:' + s.dayName, e); }
+    }
+    e.n++;
+    if (s.date > e.last) e.last = s.date;
+  });
+  const rows = [...cnt.values()];
+  if (rows.length) {
+    const maxN = Math.max(1, ...rows.map(r => r.n));
+    const minN = Math.min(...rows.map(r => r.n));
+    html += `<div class="card"><div class="chart-title">Balance de días (${label})</div>`;
+    rows.forEach(r => {
+      html += `<div class="bal-row">
+        <div class="bal-name">${esc(r.name)}</div>
+        <div class="bal-track"><div class="bal-fill${r.n === minN && minN < maxN ? ' low' : ''}" style="width:${Math.round(r.n / maxN * 100)}%"></div></div>
+        <div class="bal-n">${r.n}</div>
+      </div>`;
+    });
+    const dayRows = routine.days.map(d => cnt.get(d.id));
+    if (dayRows.length > 1) {
+      const dMin = Math.min(...dayRows.map(r => r.n)), dMax = Math.max(...dayRows.map(r => r.n));
+      if (dMax > dMin) {
+        const cand = dayRows.filter(r => r.n === dMin).sort((a, b) => (a.last || '') < (b.last || '') ? -1 : 1)[0];
+        html += `<div class="bal-hint">⚖️ Venís desparejo: te conviene hacer <b>${esc(cand.name)}</b> (${dMin} ${dMin === 1 ? 'vez' : 'veces'} contra ${dMax}).</div>`;
+      } else if (dMax > 0) {
+        html += '<div class="bal-hint ok">✅ Venís parejo entre los días.</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  // desglose: sesiones por mes (en "este año") o por año (en "todo")
+  if (statsPeriod !== 'month' && ss.length) {
+    const bucket = new Map();
+    const keyOf = statsPeriod === 'year' ? s => s.date.slice(5, 7) : s => s.date.slice(0, 4);
+    ss.forEach(s => bucket.set(keyOf(s), (bucket.get(keyOf(s)) || 0) + 1));
+    const keys = statsPeriod === 'year'
+      ? Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+      : [...bucket.keys()].sort();
+    const lbl = statsPeriod === 'year' ? k => MONTHS_ES[+k - 1] : k => k;
+    const maxB = Math.max(1, ...keys.map(k => bucket.get(k) || 0));
+    html += `<div class="card"><div class="chart-title">Sesiones por ${statsPeriod === 'year' ? 'mes' : 'año'}</div><div class="mini-bars">` +
+      keys.map(k => {
+        const n = bucket.get(k) || 0;
+        return `<div class="mini-bar"><i>${n || ''}</i><div style="height:${Math.round(n / maxB * 56)}px"></div><span>${lbl(k)}</span></div>`;
+      }).join('') +
+      '</div></div>';
+  }
+  return html;
+}
+
 // ---- progresión ----
 let progressSel = null;
 async function renderProgress(){
@@ -353,6 +436,8 @@ async function renderProgress(){
   }
 
   let html = `<h1 class="apptitle">Progresión</h1>
+    ${statsHTML(sessions)}
+    <div class="section-label">Por ejercicio</div>
     <select id="progSel" class="input">${names.map(n => `<option ${n === sel ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
   if (!pts.length) {
     html += '<p class="empty">Sin datos todavía para este ejercicio.<br>Registrá alguna sesión primero.</p>';
@@ -361,6 +446,10 @@ async function renderProgress(){
       <div class="card"><div class="chart-title">Volumen total por sesión (peso × reps, ${settings.unit})</div><div id="chartVol"></div></div>`;
   }
   const root = setView(html);
+  root.querySelectorAll('.stats-seg .seg-btn').forEach(b => b.addEventListener('click', () => {
+    statsPeriod = b.dataset.p;
+    renderProgress();
+  }));
   root.querySelector('#progSel').addEventListener('change', e => {
     progressSel = e.target.value;
     renderProgress();
@@ -577,6 +666,49 @@ function renderExerciseEditor(dayId, exId){
 }
 
 // ---- ajustes ----
+function parseFirebaseCfg(text){
+  const m = String(text || '').match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  // acepta el snippet tal cual lo da la consola de Firebase (objeto JS, no JSON estricto)
+  const t = m[0]
+    .replace(/(^|[^:])\/\/.*$/gm, '$1') // comentarios; no toca "https://..."
+    .replace(/'/g, '"')
+    .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+    .replace(/,\s*([}\]])/g, '$1');
+  try {
+    const o = JSON.parse(t);
+    return o && o.apiKey && o.projectId ? o : null;
+  } catch (e) { return null; }
+}
+
+function syncCardHTML(){
+  if (!window.Sync) return '';
+  const st = Sync.status();
+  let inner;
+  if (!st.configured) {
+    inner = `<div class="card-sub">Guardá el historial en la nube (Firebase, gratis) para tenerlo igual en todos tus dispositivos. Los pasos para crear el proyecto están en el README.</div>
+      <textarea id="sy-cfg" class="input" rows="5" placeholder="Pegá acá el objeto firebaseConfig que te da la consola de Firebase"></textarea>
+      <button id="sy-save" class="btn-ghost">Guardar configuración</button>`;
+  } else {
+    const txt = {
+      loading: 'Cargando…',
+      signedout: 'Configurado. Falta iniciar sesión.',
+      syncing: 'Sincronizando…',
+      ok: 'Sincronizado ✓' + (st.email ? ' — ' + st.email : ''),
+      error: '⚠️ ' + (st.lastError || 'Error')
+    }[st.state] || st.state;
+    inner = `<div class="card-sub">${esc(txt)}</div>`;
+    if (st.email) {
+      inner += `<button id="sy-now" class="btn-ghost">🔄 Sincronizar ahora</button>
+        <button id="sy-out" class="btn-ghost">Cerrar sesión</button>`;
+    } else if (st.state !== 'loading') {
+      inner += `<button id="sy-login" class="btn-primary">Iniciar sesión con Google</button>`;
+    }
+    inner += `<button id="sy-del" class="btn-danger">Quitar configuración de este dispositivo</button>`;
+  }
+  return `<div class="card form"><div class="ex-name">☁️ Sincronización</div>${inner}</div>`;
+}
+
 async function renderSettings(){
   setNav('settings');
   const root = setView(`
@@ -592,9 +724,10 @@ async function renderSettings(){
       <label>Descanso por defecto (segundos)<input id="s-rest" class="input" type="number" min="5" value="${settings.restSec}"></label>
       <button id="s-notif" class="btn-ghost">🔔 Activar notificaciones del timer</button>
     </div>
+    ${syncCardHTML()}
     <div class="card form">
       <button id="s-wipe" class="btn-danger">🗑 Borrar TODOS los datos</button>
-      <div class="card-sub">Rutina, historial y ajustes. Todo vive solo en este dispositivo: hacé backups desde "Rutina".</div>
+      <div class="card-sub">Rutina, historial y ajustes de este dispositivo. Hacé backups desde "Rutina".</div>
     </div>`);
 
   const setUnit = async u => {
@@ -620,18 +753,53 @@ async function renderSettings(){
       location.reload();
     }
   });
+
+  // sincronización (los botones existen según el estado)
+  const q = id => root.querySelector(id);
+  if (q('#sy-save')) q('#sy-save').addEventListener('click', () => {
+    const cfg = parseFirebaseCfg(q('#sy-cfg').value);
+    if (!cfg) { alert('No pude leer la configuración. Pegá el objeto firebaseConfig completo (con apiKey y projectId) tal cual lo da la consola de Firebase.'); return; }
+    Sync.setup(cfg);
+    toast('Configuración guardada ✓');
+    renderSettings();
+  });
+  if (q('#sy-login')) q('#sy-login').addEventListener('click', () => Sync.signIn());
+  if (q('#sy-now')) q('#sy-now').addEventListener('click', () => Sync.syncNow());
+  if (q('#sy-out')) q('#sy-out').addEventListener('click', () => Sync.signOut());
+  if (q('#sy-del')) q('#sy-del').addEventListener('click', () => {
+    if (confirm('¿Quitar la configuración de sincronización de este dispositivo? No borra nada en la nube ni el historial local.')) Sync.remove();
+  });
 }
 
 // ---- arranque ----
+async function migrate(){
+  // v2: sacamos "Plancha con peso o rueda abdominal" también de rutinas ya guardadas
+  if (await getKV('migr-noplank')) return;
+  let changed = false;
+  routine.days.forEach(d => {
+    const before = d.exercises.length;
+    d.exercises = d.exercises.filter(x => x.id !== 'd3e8' && !/plancha con peso o rueda/i.test(x.name || ''));
+    if (d.exercises.length !== before) changed = true;
+  });
+  // sin sello de edición: que esto no pise una rutina más nueva en la nube
+  if (changed) await setKV('routine', routine, true);
+  await setKV('migr-noplank', 1, true);
+}
+
 async function main(){
   await initDB();
   const r = await getKV('routine');
   if (r) routine = r;
-  else { routine = DEFAULT_ROUTINE; await setKV('routine', routine); }
+  else { routine = DEFAULT_ROUTINE; await setKV('routine', routine, true); } // seed: sin sello de edición
+  await migrate();
   settings = Object.assign({ unit: 'kg', restSec: 100 }, (await getKV('settings')) || {});
   window.addEventListener('hashchange', route);
   route();
   Timer.resume();
+  if (window.Sync) {
+    Sync.onChange(() => { if ((location.hash || '').startsWith('#/settings')) renderSettings(); });
+    Sync.init();
+  }
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }

@@ -61,8 +61,7 @@ const DEFAULT_ROUTINE = {
         ex('d3e4', 'Espalda', 'Pullover en polea', 'Prono en barra recta o soga', 3, '12-15', 'reps', 'https://musclewiki.com/exercise/cable-rope-pullover'),
         ex('d3e5', 'Tríceps', 'Press francés (o extensión sobre la cabeza)', 'Barra Z: prono cerrado / Soga: neutro', 3, '8-12', 'reps', 'https://musclewiki.com/exercise/cable-rope-skullcrusher'),
         ex('d3e6', 'Tríceps', 'Extensiones en polea con soga', 'Neutro, separando la soga abajo', 3, '10-15', 'reps', 'https://musclewiki.com/exercise/cable-rope-pushdown'),
-        ex('d3e7', 'Tríceps', 'Fondos entre bancos o press cerrado', 'Palmas al banco / Press: prono cerrado', 3, '8-12', 'reps', 'https://musclewiki.com/exercise/barbell-close-grip-bench-press'),
-        ex('d3e8', 'Abdominales', 'Plancha con peso o rueda abdominal', 'Antebrazos apoyados / rueda: prono cerrado', 3, '30-60 seg', 'time', 'https://musclewiki.com/exercise/weighted-plank-up-down')
+        ex('d3e7', 'Tríceps', 'Fondos entre bancos o press cerrado', 'Palmas al banco / Press: prono cerrado', 3, '8-12', 'reps', 'https://musclewiki.com/exercise/barbell-close-grip-bench-press')
       ],
       stretches: [
         { name: 'Dorsal colgado de la barra — 20-30 seg x2', url: 'https://greatist.com/fitness/bicep-stretch' },

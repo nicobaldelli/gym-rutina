@@ -14,7 +14,8 @@ App para registrar tu rutina de gimnasio: pesos, reps, timer de descanso, histor
 │   ├── data.js         Rutina precargada (3 días)
 │   ├── timer.js        Timer de descanso (sobrevive a cambio de app / pantalla apagada)
 │   ├── chart.js        Gráfico de línea SVG propio (sin dependencias)
-│   └── app.js          Lógica: ruteo, sesiones, historial, progresión, edición, import/export
+│   ├── sync.js         Sincronización opcional entre dispositivos (Firebase/Firestore)
+│   └── app.js          Lógica: ruteo, sesiones, historial, stats, progresión, edición, import/export
 └── icons/              Íconos 192 y 512 px
 ```
 
@@ -62,9 +63,33 @@ y abrí `http://localhost:8080` en el navegador.
 
 - **Inicio**: tocá un día → se crea la sesión con la fecha de hoy (editable). Cargá peso y reps por serie; todo se autoguarda al instante. El botón ⏱ de cada serie arranca el descanso (1:40 por defecto, configurable). En gris ves lo que levantaste la última vez.
 - **Historial**: ver, editar o borrar sesiones pasadas.
-- **Progreso**: elegí un ejercicio y mirá la evolución del peso máximo y del volumen (peso × reps).
+- **Progreso**: arriba, stats del período (este mes / este año / todo): sesiones, series, volumen, **balance entre días** (para ver si hiciste más Día 1 que Día 3 y compensar) y sesiones por mes/año. Abajo, la evolución por ejercicio del peso máximo y del volumen (peso × reps).
 - **Rutina**: agregar, borrar, reordenar y editar ejercicios; importar/exportar.
-- **Ajustes**: unidad kg/lb (los datos se guardan siempre en kg, cambiar de unidad no rompe nada), descanso por defecto, notificaciones.
+- **Ajustes**: unidad kg/lb (los datos se guardan siempre en kg, cambiar de unidad no rompe nada), descanso por defecto, notificaciones y sincronización en la nube.
+
+## Sincronización entre dispositivos (opcional, gratis)
+
+Por defecto todo vive en el dispositivo. Si querés el mismo historial en el celu y la compu, la app puede sincronizar contra **Firebase (Firestore)** con tu cuenta de Google. El plan gratuito (Spark) sobra para esto y no se pausa por inactividad. Configuración una sola vez:
+
+1. Entrá a [console.firebase.google.com](https://console.firebase.google.com) y creá un proyecto (podés desactivar Analytics).
+2. **Authentication → Sign-in method**: habilitá **Google**. En **Authentication → Settings → Authorized domains** agregá tu dominio de GitHub Pages (`TU_USUARIO.github.io`).
+3. **Firestore Database → Crear base de datos** (modo producción). En la pestaña **Reglas** pegá y publicá:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+   Así cada usuario solo puede leer/escribir sus propios datos.
+4. **Configuración del proyecto (⚙️) → Tus apps → ícono web `</>`**: registrá una app web y copiá el objeto `firebaseConfig` que te muestra.
+5. En la app: **Ajustes → ☁️ Sincronización**, pegá el `firebaseConfig`, guardá e iniciá sesión con Google.
+6. Repetí el paso 5 en cada dispositivo (misma config, misma cuenta de Google) y listo.
+
+Cómo sincroniza: sigue siendo offline-first — todo se guarda local al instante y se sube cuando hay conexión (al abrir la app, después de cada cambio, o con "Sincronizar ahora"). Si el mismo dato se editó en dos lados, gana la última edición. Los borrados también se propagan.
 
 ## Esquema JSON para importar la rutina
 
@@ -128,3 +153,4 @@ Campos obligatorios: `days` (lista), y en cada día `name` y `exercises` (lista 
 - **Pesos**: se guardan internamente en kg. Al mostrar se redondea a 0,5 kg o 1 lb según la unidad elegida.
 - **Timer**: guarda el timestamp de fin en localStorage y recalcula al volver; sobrevive a pantalla apagada, cambio de app y recarga. Vibración + sonido + notificación al terminar (el sonido requiere haber tocado la pantalla antes, limitación de Android).
 - **Autosave**: cada cambio en una serie se guarda a los ~300 ms. Si se cierra el navegador a mitad de sesión, la sesión queda "en curso" y se retoma desde Inicio.
+- **Sync**: cada sesión lleva un `updatedAt` y la rutina/ajustes un sello de versión; al sincronizar gana el más nuevo de cada lado. Los borrados dejan una marca en la nube para no resucitar en otros dispositivos. El SDK de Firebase se carga solo si configuraste la sincronización; sin conexión la app ni lo intenta.

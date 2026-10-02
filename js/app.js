@@ -133,15 +133,21 @@ async function startSession(dayId){
 }
 
 // ---- sesión de entrenamiento ----
-function findPrev(others, name){
-  for (const o of others) {
-    const en = (o.entries || []).find(x => x.name === name);
-    if (en) {
-      const sets = en.sets.filter(t => t.w != null || t.r != null);
-      if (sets.length) return { date: o.date, sets };
+const DEFAULT_VARIANTS = ['Barra', 'Mancuernas', 'Máquina', 'Hammer', 'Polea', 'Smith', 'Peso corporal'];
+
+function findPrev(others, name, variant){
+  const scan = want => {
+    for (const o of others) {
+      const en = (o.entries || []).find(x => x.name === name && (want === undefined || (x.variant || null) === want));
+      if (en) {
+        const sets = en.sets.filter(t => t.w != null || t.r != null);
+        if (sets.length) return { date: o.date, sets, variant: en.variant || null };
+      }
     }
-  }
-  return null;
+    return null;
+  };
+  // primero la última vez con el mismo equipo; si no hay, la última vez a secas
+  return (variant ? scan(variant) : null) || scan(undefined);
 }
 
 function setRowHTML(ei, si, t){
@@ -197,7 +203,7 @@ async function renderSession(id){
         ? 'En curso: ' + cur
         : (meta ? meta.sets + ' x ' + meta.repsTarget : '') + (prev ? ' · últ: ' + prevSummary(prev) : '');
       html += `<a class="card card-row" href="#/session/${s.id}/ex/${ei}">
-        <div><div class="card-title">${esc(en.name)}</div><div class="card-sub">${esc(sub)}</div></div>
+        <div><div class="card-title">${esc(en.name)}${en.variant ? ' · ' + esc(en.variant) : ''}</div><div class="card-sub">${esc(sub)}</div></div>
         <div class="chev">›</div></a>`;
     }
   }
@@ -206,7 +212,7 @@ async function renderSession(id){
     html += `<div class="section-label">${isDone ? 'Ejercicios (tocá para editar)' : 'Hechos ✓'}</div>`;
     for (const [en, ei] of ready) {
       html += `<a class="card card-row card-done" href="#/session/${s.id}/ex/${ei}">
-        <div><div class="card-title">✓ ${esc(en.name)}</div><div class="card-sub">${esc(setsSummary(en) || 'Sin datos')}</div></div>
+        <div><div class="card-title">✓ ${esc(en.name)}${en.variant ? ' · ' + esc(en.variant) : ''}</div><div class="card-sub">${esc(setsSummary(en) || 'Sin datos')}</div></div>
         <div class="chev">›</div></a>`;
     }
   }
@@ -215,10 +221,10 @@ async function renderSession(id){
   if (!isDone) {
     if (!pend.length) {
       if (stretches.length && !s.stretchesDone) {
-        html += `<div class="card"><div class="ex-name">🧘 Elongación post-entreno</div><ul class="stretch-list">` +
-          stretches.map(x => `<li>${esc(x.name)}${x.url ? ` — <a href="${esc(x.url)}" target="_blank" rel="noopener">ver ↗</a>` : ''}</li>`).join('') +
-          `</ul>
-          <button id="stretchDone" class="btn-primary">✓ Terminé la elongación</button>
+        html += `<div class="card"><div class="ex-name">🧘 Elongación post-entreno</div>` +
+          stretches.map(x => `<div class="stretch-item">${stretchMediaHTML(x)}
+            <div class="stretch-info">${esc(x.name)}${x.url ? `<br><a href="${esc(x.url)}" target="_blank" rel="noopener">ver más ↗</a>` : ''}</div></div>`).join('') +
+          `<button id="stretchDone" class="btn-primary">✓ Terminé la elongación</button>
           <button id="stretchSkip" class="btn-ghost">Saltar elongación por hoy</button></div>`;
       } else {
         html += `<div class="card"><div class="ex-name">🎉 ¡Día completo!</div>
@@ -279,10 +285,12 @@ async function renderSessionExercise(id, eiRaw){
   const day = routine.days.find(d => d.id === s.dayId);
   const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
   const others = (await getAllSessions()).filter(x => x.id !== s.id).sort(byDateDesc);
-  const prev = findPrev(others, en.name);
+  const prev = findPrev(others, en.name, en.variant || null);
   const isTime = en.type === 'time';
   const isDone = s.status === 'done';
   const doneN = s.entries.filter(x => x.done).length;
+  const variants = (meta && Array.isArray(meta.variants) && meta.variants.length) ? meta.variants : DEFAULT_VARIANTS;
+  const prevText = p => `Última vez (${fmtDate(p.date)}${p.variant ? ', ' + p.variant : ''}): ${prevSummary(p)} ${settings.unit}`;
 
   let html = `<div class="session-head">
     <a class="back" href="#/session/${s.id}">‹ Rutina del día${isDone ? '' : ` (${doneN}/${s.entries.length})`}</a>
@@ -296,11 +304,17 @@ async function renderSessionExercise(id, eiRaw){
       </div>
       ${meta && meta.url ? `<a class="demo" href="${esc(meta.url)}" target="_blank" rel="noopener">Ver demo ↗</a>` : ''}
     </div>
-    ${prev ? `<div class="prev">Última vez (${fmtDate(prev.date)}): ${prevSummary(prev)} ${settings.unit}</div>` : ''}
+    <div class="variants">${variants.map(v => `<button class="chip${(en.variant || '') === v ? ' on' : ''}" data-v="${esc(v)}">${esc(v)}</button>`).join('')}</div>
+    <div class="prev" id="prevBox" ${prev ? '' : 'hidden'}>${prev ? esc(prevText(prev)) : ''}</div>
     <div class="sets" data-ei="${ei}">
       <div class="set-row set-row-head"><span>#</span><span>Peso (${settings.unit})</span><span>${isTime ? 'Seg' : 'Reps'}</span><span></span></div>`;
   en.sets.forEach((t, si) => { html += setRowHTML(ei, si, t); });
   html += `</div>
+    <div id="restInline" class="rest-inline" hidden>
+      <div class="rest-top"><span id="riLabel">Descanso</span><b id="riTime">0:00</b></div>
+      <div class="rest-track"><div id="riBar"></div></div>
+      <div class="rest-btns"><button id="riMinus">−15s</button><button id="riPlus">+15s</button><button id="riSkip">Saltar</button></div>
+    </div>
     <button class="btn-ghost add-set">+ serie</button>
   </section>
   <div class="session-actions">
@@ -337,6 +351,18 @@ async function renderSessionExercise(id, eiRaw){
   });
 
   root.addEventListener('click', async e => {
+    const chip = e.target.closest('.chip');
+    if (chip) {
+      en.variant = en.variant === chip.dataset.v ? null : chip.dataset.v;
+      root.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.v === en.variant));
+      // refresca "última vez" para el equipo elegido
+      const p = findPrev(others, en.name, en.variant || null);
+      const box = root.querySelector('#prevBox');
+      box.hidden = !p;
+      box.textContent = p ? prevText(p) : '';
+      save();
+      return;
+    }
     if (e.target.closest('.btn-timer')) {
       Timer.start((meta && meta.restSec) || settings.restSec);
       return;
@@ -392,7 +418,7 @@ async function renderHistoryDetail(id){
     <div class="card-sub">${fmtDate(s.date)}${s.status === 'open' ? ' · en curso' : ''} · volumen total ${fmtWeight(totalVolume(s))}</div></div>`;
   for (const en of s.entries) {
     const sets = en.sets.filter(t => t.w != null || t.r != null);
-    html += `<div class="card"><div class="ex-name">${esc(en.name)}</div>` +
+    html += `<div class="card"><div class="ex-name">${esc(en.name)}${en.variant ? ' · ' + esc(en.variant) : ''}</div>` +
       (sets.length
         ? `<div class="detail-sets">${sets.map((t, i) => `<span class="pill">${i + 1}: ${t.w != null ? fmtWeight(t.w, false) : '—'}×${t.r != null ? t.r : '—'}${en.type === 'time' ? '″' : ''}</span>`).join('')}</div>`
         : '<div class="card-sub">Sin datos</div>') +
@@ -601,10 +627,10 @@ async function renderRoutine(){
   root.querySelector('#expHistCsv').addEventListener('click', async () => {
     const ss = (await getAllSessions()).sort(byDateAsc);
     const q = t => '"' + String(t).replace(/"/g, '""') + '"';
-    let csv = 'fecha,dia,ejercicio,serie,peso_kg,reps_o_seg\n';
+    let csv = 'fecha,dia,ejercicio,equipo,serie,peso_kg,reps_o_seg\n';
     for (const s of ss) for (const en of s.entries) en.sets.forEach((t, i) => {
       if (t.w == null && t.r == null) return;
-      csv += [s.date, q(s.dayName), q(en.name), i + 1, t.w != null ? round2(t.w) : '', t.r != null ? t.r : ''].join(',') + '\n';
+      csv += [s.date, q(s.dayName), q(en.name), q(en.variant || ''), i + 1, t.w != null ? round2(t.w) : '', t.r != null ? t.r : ''].join(',') + '\n';
     });
     download('historial.csv', csv, 'text/csv');
   });
@@ -640,11 +666,12 @@ function validateRoutine(obj){
         repsTarget: strOr(x.repsTarget) || '8-12',
         type: x.type === 'time' ? 'time' : 'reps',
         restSec: !isNaN(rest) && rest >= 5 ? rest : DEFAULT_REST,
-        url: strOr(x.url)
+        url: strOr(x.url),
+        variants: Array.isArray(x.variants) ? x.variants.map(v => String(v).trim()).filter(Boolean).slice(0, 20) : []
       };
     }).filter(Boolean);
     const stretches = Array.isArray(d.stretches)
-      ? d.stretches.filter(t => t && t.name).map(t => ({ name: String(t.name), url: strOr(t.url) }))
+      ? d.stretches.filter(t => t && t.name).map(t => ({ name: String(t.name), url: strOr(t.url), media: strOr(t.media) }))
       : [];
     return { id: typeof d.id === 'string' ? d.id : uid(), name: String(d.name || `Día ${di + 1}`), exercises, stretches };
   }).filter(Boolean);
@@ -701,7 +728,7 @@ function renderExerciseEditor(dayId, exId){
   if (!day) { location.hash = '#/routine'; return; }
   const isNew = exId === 'new';
   const x = isNew
-    ? { group: '', name: '', grip: '', sets: 3, repsTarget: '8-12', type: 'reps', restSec: settings.restSec, url: '' }
+    ? { group: '', name: '', grip: '', sets: 3, repsTarget: '8-12', type: 'reps', restSec: settings.restSec, url: '', variants: [] }
     : day.exercises.find(e => e.id === exId);
   if (!x) { location.hash = '#/routine'; return; }
 
@@ -712,6 +739,8 @@ function renderExerciseEditor(dayId, exId){
       <label>Nombre<input id="f-name" class="input" value="${esc(x.name)}"></label>
       <label>Grupo muscular<input id="f-group" class="input" value="${esc(x.group)}"></label>
       <label>Agarre<input id="f-grip" class="input" value="${esc(x.grip)}"></label>
+      <label>Equipos / variantes (separar con coma)<input id="f-variants" class="input" placeholder="Barra, Mancuernas, Máquina…" value="${esc((x.variants || []).join(', '))}"></label>
+      <div class="card-sub">Si lo dejás vacío, en la sesión vas a ver la lista estándar (Barra, Mancuernas, Máquina, Hammer, Polea, Smith, Peso corporal).</div>
       <div class="form-row">
         <label>Series<input id="f-sets" class="input" type="number" min="1" max="20" value="${x.sets}"></label>
         <label>Reps objetivo<input id="f-reps" class="input" value="${esc(x.repsTarget)}"></label>
@@ -738,7 +767,8 @@ function renderExerciseEditor(dayId, exId){
       repsTarget: root.querySelector('#f-reps').value.trim() || '8-12',
       type: root.querySelector('#f-type').value,
       restSec: Math.max(5, parseInt(root.querySelector('#f-rest').value) || settings.restSec),
-      url: root.querySelector('#f-url').value.trim()
+      url: root.querySelector('#f-url').value.trim(),
+      variants: root.querySelector('#f-variants').value.split(',').map(t => t.trim()).filter(Boolean)
     };
     if (isNew) day.exercises.push(Object.assign({ id: uid() }, data));
     else Object.assign(x, data);

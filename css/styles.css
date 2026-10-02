@@ -47,6 +47,33 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .card-done .card-title{color:var(--ok)}
 .stretch-list{margin:10px 0;padding-left:20px}
 .stretch-list li{margin:8px 0;font-size:15px}
+
+.stretch-item{display:flex;gap:12px;align-items:center;margin:12px 0}
+.stretch-demo{flex:0 0 110px;background:var(--card2);border-radius:12px;display:flex;justify-content:center;overflow:hidden}
+.stretch-demo svg{width:110px;height:82px;display:block}
+.stretch-media{flex:0 0 110px;width:110px;height:82px;object-fit:cover;border-radius:12px;background:var(--card2)}
+.stretch-info{font-size:15px;min-width:0}
+.sd-head{fill:none;stroke:var(--muted);stroke-width:4}
+.sd-l{fill:none;stroke:var(--muted);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.sd-s{fill:none;stroke:var(--line);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.sd-h{fill:none;stroke:var(--accent);stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round}
+.sd-a{animation:sdA 3s ease-in-out infinite}
+.sd-b{animation:sdB 3s ease-in-out infinite}
+@keyframes sdA{0%,30%{opacity:1}55%,80%{opacity:0}100%{opacity:1}}
+@keyframes sdB{0%,30%{opacity:0}55%,80%{opacity:1}100%{opacity:0}}
+
+.variants{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{border:1px solid var(--line);background:var(--card2);color:var(--muted);border-radius:99px;padding:6px 12px;font-size:14px}
+.chip.on{background:var(--accent);color:#0b1220;border-color:var(--accent);font-weight:700}
+
+.rest-inline{background:var(--card2);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;margin:10px 0}
+.rest-top{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-size:15px}
+.rest-top b{font-size:28px;color:var(--text);font-variant-numeric:tabular-nums}
+.rest-track{height:10px;background:var(--bg);border-radius:99px;overflow:hidden;margin:8px 0 10px}
+#riBar{height:100%;background:var(--accent);width:0%;transition:width .2s linear}
+.rest-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rest-btns button{border:1px solid var(--line);background:var(--card);color:var(--text);font-size:15px;padding:9px 0;border-radius:10px}
+#riSkip{border-color:var(--accent);color:var(--accent)}
 .back{display:inline-block;color:var(--muted);font-size:15px;margin-bottom:4px}
 .date-row{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:15px;margin-top:6px}
 input,select{font:inherit}

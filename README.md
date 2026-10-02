@@ -61,7 +61,7 @@ y abrí `http://localhost:8080` en el navegador.
 
 ## Uso rápido
 
-- **Inicio**: tocá un día → se crea la sesión con la fecha de hoy (editable) y se abre el **hub del día**: elegís el ejercicio que vas a hacer (de a uno), lo completás en su propia pantalla y lo marcás con "✓ Terminé este ejercicio". Volvés al hub con la barra de progreso, los pendientes y los hechos (tocá uno hecho para revisarlo o corregirlo; también podés desmarcarlo). Al terminar todos aparece la elongación y, cuando la marcás (o la saltás), confirmás la sesión. El botón ⏱ de cada serie arranca el descanso (1:40 por defecto, configurable), en gris ves lo que levantaste la última vez, y todo se autoguarda al instante. Si cortás antes, "Finalizar ahora" guarda igual.
+- **Inicio**: tocá un día → se crea la sesión con la fecha de hoy (editable) y se abre el **hub del día**: elegís el ejercicio que vas a hacer (de a uno), lo completás en su propia pantalla y lo marcás con "✓ Terminé este ejercicio". Volvés al hub con la barra de progreso, los pendientes y los hechos (tocá uno hecho para revisarlo o corregirlo; también podés desmarcarlo). Al terminar todos aparece la elongación —cada estiramiento con su demo animada dentro de la app (o tu propio gif/video si le cargás `media` en el JSON)— y, cuando la marcás (o la saltás), confirmás la sesión. En cada ejercicio podés elegir el **equipo** del día con chips (Barra, Mancuernas, Máquina, Hammer…, o la lista propia del ejercicio) y "última vez" te muestra lo que hiciste con ese mismo equipo. El botón ⏱ de cada serie arranca el descanso **dentro de la misma pantalla**: una barra que se va llenando con el tiempo restante, botones ±15s/Saltar, y al terminar vibra, suena y te avisa con una notificación. Todo se autoguarda al instante; si cortás antes, "Finalizar ahora" guarda igual.
 - **Historial**: ver, editar o borrar sesiones pasadas.
 - **Progreso**: arriba, stats del período (este mes / este año / todo): sesiones, series, volumen, **balance entre días** (para ver si hiciste más Día 1 que Día 3 y compensar) y sesiones por mes/año. Abajo, la evolución por ejercicio del peso máximo y del volumen (peso × reps).
 - **Rutina**: agregar, borrar, reordenar y editar ejercicios; importar/exportar.
@@ -109,7 +109,8 @@ Campos obligatorios: `days` (lista), y en cada día `name` y `exercises` (lista 
 | `days[].exercises[].type` | `"reps"` \| `"time"` | `"reps"` | `"time"` para ejercicios por segundos (ej. plancha) |
 | `days[].exercises[].restSec` | número 5-3600 | `100` | Descanso sugerido en segundos |
 | `days[].exercises[].url` | string | `""` | Link de demo |
-| `days[].stretches[]` | lista | `[]` | Elongación (solo lectura): `{ "name", "url" }` |
+| `days[].exercises[].variants` | lista de strings | `[]` | Equipos/variantes a elegir en la sesión (ej. `["Barra","Mancuernas"]`); vacío usa la lista estándar |
+| `days[].stretches[]` | lista | `[]` | Elongación (solo lectura): `{ "name", "url", "media" }` — `media` es una URL opcional de gif/mp4/webm que se muestra dentro de la app; sin `media`, la app muestra su propia demo animada |
 
 ### Ejemplo mínimo
 

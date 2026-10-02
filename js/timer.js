@@ -20,8 +20,23 @@ const Timer = (() => {
   function save(st){ if (st) localStorage.setItem(LS_KEY, JSON.stringify(st)); else localStorage.removeItem(LS_KEY); }
   function fmt(sec){ const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
 
-  function show(){ el('timerOverlay').classList.add('show'); }
-  function hide(){ el('timerOverlay').classList.remove('show'); }
+  // Si la vista actual tiene el timer inline (#restInline, en la pantalla del
+  // ejercicio) se usa ese; si no, el overlay a pantalla completa.
+  function ui(){
+    const inline = el('restInline');
+    if (inline) return { inline: true, box: inline, label: el('riLabel'), time: el('riTime'), bar: el('riBar') };
+    return { inline: false, box: el('timerOverlay'), label: el('timerLabel'), time: el('timerTime'), bar: el('timerBar') };
+  }
+  function show(){
+    const u = ui();
+    if (u.inline) { u.box.hidden = false; el('timerOverlay').classList.remove('show'); }
+    else u.box.classList.add('show');
+  }
+  function hide(){
+    const inline = el('restInline');
+    if (inline) inline.hidden = true;
+    el('timerOverlay').classList.remove('show');
+  }
   function stopLoop(){ clearInterval(tick); tick = null; }
   function loop(){ stopLoop(); update(); tick = setInterval(update, 200); }
 
@@ -30,10 +45,13 @@ const Timer = (() => {
     if (!st) { stopLoop(); hide(); return; }
     const rem = Math.ceil((st.endTs - Date.now()) / 1000);
     if (rem <= 0) { finish(); return; }
-    el('timerLabel').textContent = 'Descanso';
-    el('timerTime').textContent = fmt(rem);
+    const u = ui();
+    if (u.inline ? u.box.hidden : !u.box.classList.contains('show')) show();
+    u.label.textContent = 'Descanso';
+    u.time.textContent = fmt(rem);
     const pct = Math.max(0, Math.min(1, rem / st.total));
-    el('timerBar').style.width = (pct * 100) + '%';
+    // inline: barra que se va llenando; overlay: barra que se vacía
+    u.bar.style.width = ((u.inline ? 1 - pct : pct) * 100) + '%';
   }
 
   function start(sec){
@@ -52,11 +70,13 @@ const Timer = (() => {
 
   function finish(){
     save(null); stopLoop();
-    el('timerTime').textContent = '0:00';
-    el('timerLabel').textContent = '¡Descanso terminado!';
-    el('timerBar').style.width = '0%';
+    const u = ui();
+    u.time.textContent = '0:00';
+    u.label.textContent = '¡Descanso terminado!';
+    u.bar.style.width = u.inline ? '100%' : '0%';
     if (navigator.vibrate) { try { navigator.vibrate([300, 120, 300, 120, 600]); } catch (e) {} }
     beep(); notify();
+    if (typeof toast === 'function') toast('⏱ ¡Descanso terminado! Siguiente serie 💪', 3500);
     setTimeout(hide, 4000);
   }
 
@@ -105,6 +125,13 @@ const Timer = (() => {
   document.getElementById('tMinus').addEventListener('click', () => adjust(-15));
   document.getElementById('tPlus').addEventListener('click', () => adjust(15));
   document.getElementById('tSkip').addEventListener('click', skip);
+
+  // los botones del timer inline viven en vistas que se re-renderizan: delegación global
+  document.addEventListener('click', e => {
+    if (e.target.id === 'riMinus') adjust(-15);
+    else if (e.target.id === 'riPlus') adjust(15);
+    else if (e.target.id === 'riSkip') skip();
+  });
 
   return { start, adjust, skip, resume };
 })();

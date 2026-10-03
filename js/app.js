@@ -1048,6 +1048,22 @@ async function migrateV3(){
   await setKV('migr-v3', 1, true);
 }
 
+async function migrateV31(){
+  // v3.1: en el pool de abs, "Elevación de piernas tumbado" sale y entran
+  // "Elevación de piernas en paralelas (máquina de dips)" y "Crunch en colchoneta".
+  if (await getKV('migr-v31')) return;
+  if (Array.isArray(routine.absPool)) {
+    let changed = false;
+    const i = routine.absPool.findIndex(p => /elevaci[oó]n de piernas tumbado/i.test(p.name || ''));
+    if (i >= 0) { routine.absPool.splice(i, 1); changed = true; }
+    const adds = DEFAULT_ABS_POOL.filter(p =>
+      /paralelas|colchoneta/i.test(p.name) && !routine.absPool.some(x => x.name === p.name));
+    if (adds.length) { routine.absPool.splice(2, 0, ...adds); changed = true; }
+    if (changed) await setKV('routine', routine, true);
+  }
+  await setKV('migr-v31', 1, true);
+}
+
 async function main(){
   await initDB();
   const r = await getKV('routine');
@@ -1055,6 +1071,7 @@ async function main(){
   else { routine = DEFAULT_ROUTINE; await setKV('routine', routine, true); } // seed: sin sello de edición
   await migrate();
   await migrateV3();
+  await migrateV31();
   settings = Object.assign({ unit: 'kg', restSec: 100 }, (await getKV('settings')) || {});
   window.addEventListener('hashchange', route);
   route();

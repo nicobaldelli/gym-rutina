@@ -10,8 +10,9 @@ function ex(id, group, name, grip, sets, repsTarget, type, url){
 const DEFAULT_ABS_POOL = [
   { name: 'Crunch en polea con peso', type: 'reps', sets: 3, repsTarget: '10-15', url: 'https://musclewiki.com/exercise/cable-standing-crunch' },
   { name: 'Elevación de piernas/rodillas colgado', type: 'reps', sets: 3, repsTarget: '10-15', url: 'https://musclewiki.com/exercise/hanging-knee-raises' },
+  { name: 'Elevación de piernas en paralelas (máquina de dips)', type: 'reps', sets: 3, repsTarget: '10-15', url: '' },
   { name: 'Crunch en máquina', type: 'reps', sets: 3, repsTarget: '10-15', url: '' },
-  { name: 'Elevación de piernas tumbado', type: 'reps', sets: 3, repsTarget: '12-20', url: '' },
+  { name: 'Crunch en colchoneta', type: 'reps', sets: 3, repsTarget: '15-20', url: '' },
   { name: 'Crunch en banco declinado', type: 'reps', sets: 3, repsTarget: '10-15', url: '' },
   { name: 'Russian twist con disco', type: 'reps', sets: 3, repsTarget: '20 (10/lado)', url: '' }
 ];

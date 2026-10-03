@@ -57,7 +57,10 @@ button.abs-opt{width:100%}
 .stretch-demo{flex:0 0 110px;background:var(--card2);border-radius:12px;display:flex;justify-content:center;overflow:hidden}
 .stretch-demo svg{width:110px;height:82px;display:block}
 .stretch-media{flex:0 0 110px;width:110px;height:82px;object-fit:cover;border-radius:12px;background:var(--card2)}
-.stretch-info{font-size:15px;min-width:0}
+.stretch-info{font-size:15px;min-width:0;flex:1}
+.stretch-tick{flex:0 0 40px;height:40px;border:2px solid var(--line);border-radius:50%;background:var(--card2);color:var(--ok);font-size:19px;font-weight:800;line-height:1}
+.stretch-tick.on{border-color:var(--ok);background:rgba(61,220,133,.14)}
+.stretch-item.done .stretch-info{color:var(--muted)}
 .sd-head{fill:none;stroke:var(--muted);stroke-width:4}
 .sd-l{fill:none;stroke:var(--muted);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
 .sd-s{fill:none;stroke:var(--line);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}

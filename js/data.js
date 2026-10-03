@@ -6,12 +6,23 @@ function ex(id, group, name, grip, sets, repsTarget, type, url){
   return { id, group, name, grip, sets, repsTarget, type, restSec: DEFAULT_REST, url };
 }
 
+/* Abdominales elegibles: cada día arranca eligiendo uno de estos. */
+const DEFAULT_ABS_POOL = [
+  { name: 'Crunch en polea con peso', type: 'reps', sets: 3, repsTarget: '10-15', url: 'https://musclewiki.com/exercise/cable-standing-crunch' },
+  { name: 'Elevación de piernas/rodillas colgado', type: 'reps', sets: 3, repsTarget: '10-15', url: 'https://musclewiki.com/exercise/hanging-knee-raises' },
+  { name: 'Crunch en máquina', type: 'reps', sets: 3, repsTarget: '10-15', url: '' },
+  { name: 'Elevación de piernas tumbado', type: 'reps', sets: 3, repsTarget: '12-20', url: '' },
+  { name: 'Crunch en banco declinado', type: 'reps', sets: 3, repsTarget: '10-15', url: '' },
+  { name: 'Russian twist con disco', type: 'reps', sets: 3, repsTarget: '20 (10/lado)', url: '' }
+];
+
 const DEFAULT_ROUTINE = {
   version: 1,
+  absPool: DEFAULT_ABS_POOL,
   days: [
     {
       id: 'd1',
-      name: 'Día 1 - Pecho y Bíceps',
+      name: 'Pecho y Bíceps',
       exercises: [
         ex('d1e1', 'Pecho', 'Press plano (barra o mancuernas)', 'Prono, ancho apenas mayor a hombros', 4, '6-10', 'reps', 'https://musclewiki.com/exercise/barbell-bench-press'),
         ex('d1e2', 'Pecho', 'Press inclinado con mancuernas', 'Prono o semi-neutro (45°), ancho de hombros', 3, '8-12', 'reps', 'https://musclewiki.com/exercise/dumbbell-incline-bench-press'),
@@ -20,7 +31,6 @@ const DEFAULT_ROUTINE = {
         ex('d1e5', 'Bíceps', 'Curl con barra (recta o Z)', 'Supino, ancho de hombros', 4, '8-10', 'reps', 'https://musclewiki.com/exercise/barbell-curl'),
         ex('d1e6', 'Bíceps', 'Curl inclinado con mancuernas', 'Supino, brazos colgando verticales', 3, '10-12', 'reps', 'https://musclewiki.com/exercise/dumbbell-incline-curl'),
         ex('d1e7', 'Bíceps', 'Curl martillo', 'Neutro (palmas enfrentadas)', 3, '10-15', 'reps', 'https://musclewiki.com/exercise/dumbbell-hammer-curl'),
-        ex('d1e8', 'Abdominales', 'Crunch en polea con peso', 'Soga a los costados de la cabeza', 3, '10-15', 'reps', 'https://musclewiki.com/exercise/cable-standing-crunch'),
         ex('d1e9', 'Opcional', 'Fondos negativos o con banda (práctica)', 'Neutro en paralelas, torso inclinado adelante', 2, '3-5', 'reps', 'https://musclewiki.com/exercise/plate-weighted-dip')
       ],
       stretches: [
@@ -32,7 +42,7 @@ const DEFAULT_ROUTINE = {
     },
     {
       id: 'd2',
-      name: 'Día 2 - Piernas y Hombros',
+      name: 'Piernas y Hombros',
       exercises: [
         ex('d2e1', 'Piernas', 'Sentadilla con barra (o prensa)', 'Barra: prono, apenas más ancho que hombros', 4, '6-10', 'reps', 'https://musclewiki.com/exercise/barbell-squat'),
         ex('d2e2', 'Piernas', 'Pull-through en polea', 'Soga entre las piernas, palmas enfrentadas', 3, '12-15', 'reps', 'https://weighttraining.guide/exercises/cable-pull-through/'),
@@ -40,8 +50,7 @@ const DEFAULT_ROUTINE = {
         ex('d2e4', 'Piernas', 'Gemelos de pie', 'Apoyo en metatarsos, talón libre', 3, '12-20', 'reps', 'https://musclewiki.com/exercise/machine-standing-calf-raises'),
         ex('d2e5', 'Hombros', 'Press militar (barra o mancuernas)', 'Prono, apenas más ancho que hombros', 4, '6-10', 'reps', 'https://musclewiki.com/articles/mastering-the-barbell-overhead-press'),
         ex('d2e6', 'Hombros', 'Elevaciones laterales', 'Neutro, codo semi-flexionado', 3, '12-20', 'reps', 'https://musclewiki.com/exercise/dumbbell-lateral-raise'),
-        ex('d2e7', 'Hombros', 'Face pulls o pájaros', 'Soga: prono, pulgares hacia atrás', 3, '12-15', 'reps', 'https://musclewiki.com/exercise/machine-face-pulls'),
-        ex('d2e8', 'Abdominales', 'Elevación de piernas/rodillas colgado', 'Prono en barra, ancho de hombros', 3, '10-15', 'reps', 'https://musclewiki.com/exercise/hanging-knee-raises')
+        ex('d2e7', 'Hombros', 'Face pulls o pájaros', 'Soga: prono, pulgares hacia atrás', 3, '12-15', 'reps', 'https://musclewiki.com/exercise/machine-face-pulls')
       ],
       stretches: [
         { name: 'Cuádriceps de pie — 30 seg/lado', url: 'https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/stretching/art-20546848' },
@@ -53,7 +62,7 @@ const DEFAULT_ROUTINE = {
     },
     {
       id: 'd3',
-      name: 'Día 3 - Espalda y Tríceps',
+      name: 'Espalda y Tríceps',
       exercises: [
         ex('d3e1', 'Espalda', 'Dominadas o jalón al pecho', 'Prono, apenas más ancho que hombros', 4, '6-10', 'reps', 'https://musclewiki.com/exercise/weighted-pull-ups'),
         ex('d3e2', 'Espalda', 'Remo con barra o en máquina', 'Prono, ancho de hombros', 4, '8-10', 'reps', 'https://musclewiki.com/exercise/barbell-bent-over-row'),

@@ -100,8 +100,8 @@ async function renderHome(){
     }
   }
   html += '<div class="section-label">Elegí el día de hoy</div>';
-  routine.days.forEach((d, i) => {
-    html += `<button class="card card-day" data-day="${esc(d.id)}"><div class="daynum">${i + 1}</div><div><div class="card-title">${esc(d.name)}</div><div class="card-sub">${d.exercises.length} ejercicios</div></div></button>`;
+  routine.days.forEach(d => {
+    html += `<button class="card card-day" data-day="${esc(d.id)}"><div><div class="card-title">${esc(d.name)}</div><div class="card-sub">${d.exercises.length} ejercicios + abs y calentamiento</div></div></button>`;
   });
   const root = setView(html);
   root.querySelectorAll('.card-day').forEach(btn =>
@@ -119,6 +119,8 @@ async function startSession(dayId){
     date: todayISO(),
     startedAt: Date.now(),
     status: 'open',
+    flowV: 2, // flujo por pasos: a. abs, b. calor, c. ejercicios, d. elongación
+    warmupDone: false,
     stretchesDone: false,
     entries: day.exercises.map(x => ({
       exerciseId: x.id,
@@ -190,11 +192,81 @@ async function renderSession(id){
     ${!isDone ? `<div class="prog-row"><div class="prog-track"><div class="prog-fill" style="width:${total ? Math.round(doneN / total * 100) : 0}%"></div></div><span class="prog-txt">${doneN}/${total}</span></div>` : ''}
   </div>`;
 
-  const pend = [], ready = [];
-  s.entries.forEach((en, ei) => ((en.done || isDone) ? ready : pend).push([en, ei]));
+  // flujo por pasos (a. abdominales, b. calentamiento, c. ejercicios, d. elongación);
+  // sesiones viejas (sin flowV) siguen con el flujo simple de ejercicios
+  const flow2 = (s.flowV || 1) >= 2;
+  const absEn = s.entries.find(en => en.step === 'abs');
+  const absIdx = s.entries.indexOf(absEn);
+  const pool = (routine.absPool && routine.absPool.length) ? routine.absPool : DEFAULT_ABS_POOL;
 
-  if (pend.length) {
-    html += `<div class="section-label">Elegí el próximo ejercicio · ${pend.length} restante${pend.length === 1 ? '' : 's'}</div>`;
+  const pend = [], ready = [];
+  s.entries.forEach((en, ei) => {
+    if (!isDone && en.step === 'abs' && !en.done) return; // el paso a. lo maneja el stepper
+    ((en.done || isDone) ? ready : pend).push([en, ei]);
+  });
+
+  const stretches = (day && day.stretches) || [];
+  const step = isDone ? '' :
+    flow2 && !(absEn && absEn.done) ? 'abs' :
+    flow2 && !s.warmupDone ? 'warm' :
+    pend.length ? 'ex' : 'stretch';
+
+  if (!isDone && flow2) {
+    const order = ['abs', 'warm', 'ex', 'stretch'];
+    const labels = ['Abs', 'Calor', 'Ejercicios', 'Elongación'];
+    const cur = order.indexOf(step);
+    html += '<div class="steps">' + order.map((k, i) =>
+      `<div class="step${i < cur ? ' done' : i === cur ? ' on' : ''}">${i < cur ? '✓' : String.fromCharCode(97 + i) + '.'} ${labels[i]}</div>`
+    ).join('') + '</div>';
+  }
+
+  // --- paso a: abdominales ---
+  if (step === 'abs') {
+    if (absEn) {
+      const cur = setsSummary(absEn);
+      html += `<div class="section-label">a. Abdominales de hoy</div>
+        <a class="card card-row" href="#/session/${s.id}/ex/${absIdx}">
+          <div><div class="card-title">${esc(absEn.name)}</div><div class="card-sub">${cur ? 'En curso: ' + esc(cur) : 'Tocá para cargar las series'}</div></div>
+          <div class="chev">›</div></a>
+        <button id="absChange" class="btn-ghost">↺ Elegir otro abdominal</button>`;
+    } else {
+      html += `<div class="section-label">a. Abdominales — elegí el de hoy</div>`;
+      pool.forEach((p, pi) => {
+        const prev = findPrev(others, p.name);
+        html += `<button class="card card-row abs-opt" data-abs="${pi}">
+          <div style="text-align:left"><div class="card-title">${esc(p.name)}</div>
+          <div class="card-sub">${esc((p.sets || 3) + ' x ' + (p.repsTarget || '10-15'))}${prev ? ' · últ: ' + esc(prevSummary(prev)) : ''}</div></div>
+          <div class="chev">›</div></button>`;
+      });
+    }
+  }
+
+  // --- paso b: entrada en calor ---
+  if (step === 'warm') {
+    const machine = settings.warmupMode === 'machine';
+    html += `<div class="section-label">b. Entrada en calor</div>
+      <div class="card">
+        <div class="ex-name">🏃 5 minutos de correr</div>
+        <div class="variants">
+          <button class="chip${machine ? '' : ' on'}" data-warmmode="timer">Con reloj acá</button>
+          <button class="chip${machine ? ' on' : ''}" data-warmmode="machine">En cinta (sin reloj)</button>
+        </div>
+        <div class="card-sub">${machine
+          ? 'La cinta ya te marca el tiempo: marcá acá cuando termines.'
+          : 'Ritmo suave. Arrancá el reloj o marcalo cuando termines.'}</div>
+        ${machine ? '' : `<div id="restInline" class="rest-inline" hidden>
+          <div class="rest-top"><span id="riLabel">Corriendo</span><b id="riTime">5:00</b></div>
+          <div class="rest-track"><div id="riBar"></div></div>
+          <div class="rest-btns"><button id="riMinus">−15s</button><button id="riPlus">+15s</button><button id="riSkip">Parar</button></div>
+        </div>
+        <button id="warmStart" class="btn-ghost">▶ Arrancar 5:00</button>`}
+        <button id="warmDoneBtn" class="btn-primary">✓ Terminé el calentamiento</button>
+      </div>`;
+  }
+
+  // --- paso c: ejercicios ---
+  if (step === 'ex') {
+    html += `<div class="section-label">${flow2 ? 'c. Ejercicios — e' : 'E'}legí el próximo · ${pend.length} restante${pend.length === 1 ? '' : 's'}</div>`;
     for (const [en, ei] of pend) {
       const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
       const cur = setsSummary(en);
@@ -208,6 +280,21 @@ async function renderSession(id){
     }
   }
 
+  // --- paso d: elongación (al confirmarla se guarda la sesión automáticamente) ---
+  if (step === 'stretch') {
+    if (stretches.length && !s.stretchesDone) {
+      html += `<div class="section-label">${flow2 ? 'd. ' : ''}Elongación post-entreno</div><div class="card">` +
+        stretches.map(x => `<div class="stretch-item">${stretchMediaHTML(x)}
+          <div class="stretch-info">${esc(x.name)}${x.url ? `<br><a href="${esc(x.url)}" target="_blank" rel="noopener">ver más ↗</a>` : ''}</div></div>`).join('') +
+        `<button id="stretchDone" class="btn-primary">✓ Terminé la elongación — guardar sesión</button>
+        <button id="stretchSkip" class="btn-ghost">Saltar elongación y guardar</button></div>`;
+    } else {
+      html += `<div class="card"><div class="ex-name">🎉 ¡Día completo!</div>
+        <div class="card-sub">${s.stretchesDone ? 'Ejercicios y elongación listos.' : 'Todos los ejercicios listos.'} Confirmá para guardar la sesión.</div>
+        <button id="finishBtn" class="btn-primary">💪 Finalizar y guardar sesión</button></div>`;
+    }
+  }
+
   if (ready.length) {
     html += `<div class="section-label">${isDone ? 'Ejercicios (tocá para editar)' : 'Hechos ✓'}</div>`;
     for (const [en, ei] of ready) {
@@ -217,23 +304,9 @@ async function renderSession(id){
     }
   }
 
-  const stretches = (day && day.stretches) || [];
   if (!isDone) {
-    if (!pend.length) {
-      if (stretches.length && !s.stretchesDone) {
-        html += `<div class="card"><div class="ex-name">🧘 Elongación post-entreno</div>` +
-          stretches.map(x => `<div class="stretch-item">${stretchMediaHTML(x)}
-            <div class="stretch-info">${esc(x.name)}${x.url ? `<br><a href="${esc(x.url)}" target="_blank" rel="noopener">ver más ↗</a>` : ''}</div></div>`).join('') +
-          `<button id="stretchDone" class="btn-primary">✓ Terminé la elongación</button>
-          <button id="stretchSkip" class="btn-ghost">Saltar elongación por hoy</button></div>`;
-      } else {
-        html += `<div class="card"><div class="ex-name">🎉 ¡Día completo!</div>
-          <div class="card-sub">${s.stretchesDone ? 'Ejercicios y elongación listos.' : 'Todos los ejercicios listos.'} Confirmá para guardar la sesión.</div>
-          <button id="finishBtn" class="btn-primary">💪 Finalizar y guardar sesión</button></div>`;
-      }
-    }
     html += `<div class="session-actions">
-      ${pend.length ? `<button id="finishEarly" class="btn-ghost">Finalizar ahora (faltan ${pend.length})</button>` : ''}
+      ${step !== 'stretch' ? `<button id="finishEarly" class="btn-ghost">Finalizar ahora (incompleta)</button>` : ''}
       <button id="discardBtn" class="btn-danger">Descartar sesión</button>
     </div>`;
   } else {
@@ -245,20 +318,61 @@ async function renderSession(id){
   q('#sessDate').addEventListener('change', async e => {
     if (e.target.value) { s.date = e.target.value; await putSession(s); }
   });
-  const markStretch = async msg => {
-    s.stretchesDone = true;
-    await putSession(s);
-    if (msg) toast(msg);
-    renderSession(id);
-  };
-  if (q('#stretchDone')) q('#stretchDone').addEventListener('click', () => markStretch('Elongación lista 🧘'));
-  if (q('#stretchSkip')) q('#stretchSkip').addEventListener('click', () => markStretch());
   const finish = async () => {
     s.status = 'done'; s.finishedAt = Date.now();
     await putSession(s);
     toast('Sesión guardada 💪');
     location.hash = '#/home';
   };
+
+  // paso a: elegir / cambiar abdominal
+  root.querySelectorAll('.abs-opt').forEach(b => b.addEventListener('click', async () => {
+    const p = pool[+b.dataset.abs];
+    if (!p) return;
+    s.entries.unshift({
+      exerciseId: 'abs',
+      name: p.name,
+      type: p.type === 'time' ? 'time' : 'reps',
+      step: 'abs',
+      done: false,
+      sets: Array.from({ length: p.sets || 3 }, () => ({ w: null, r: null }))
+    });
+    await putSession(s);
+    location.hash = '#/session/' + s.id + '/ex/0';
+  }));
+  if (q('#absChange')) q('#absChange').addEventListener('click', async () => {
+    const hasData = absEn && absEn.sets.some(t => t.w != null || t.r != null);
+    if (hasData && !confirm('Este abdominal ya tiene series cargadas. ¿Descartarlas y elegir otro?')) return;
+    s.entries.splice(absIdx, 1);
+    await putSession(s);
+    renderSession(id);
+  });
+
+  // paso b: calentamiento
+  root.querySelectorAll('[data-warmmode]').forEach(b => b.addEventListener('click', async () => {
+    if (settings.warmupMode === b.dataset.warmmode) return;
+    settings.warmupMode = b.dataset.warmmode; // se acuerda para la próxima
+    if (b.dataset.warmmode === 'machine') Timer.skip();
+    await setKV('settings', settings);
+    renderSession(id);
+  }));
+  if (q('#warmStart')) q('#warmStart').addEventListener('click', () =>
+    Timer.start(300, { label: 'Corriendo 🏃', done: '¡Calentamiento listo!' }));
+  if (q('#warmDoneBtn')) q('#warmDoneBtn').addEventListener('click', async () => {
+    Timer.skip();
+    s.warmupDone = true;
+    await putSession(s);
+    toast('Calentamiento listo 🏃');
+    renderSession(id); // pasa solo al paso c
+  });
+
+  // paso d: confirmar la elongación guarda la sesión automáticamente
+  const markStretch = async () => {
+    s.stretchesDone = true;
+    await finish();
+  };
+  if (q('#stretchDone')) q('#stretchDone').addEventListener('click', markStretch);
+  if (q('#stretchSkip')) q('#stretchSkip').addEventListener('click', markStretch);
   if (q('#finishBtn')) q('#finishBtn').addEventListener('click', finish);
   if (q('#finishEarly')) q('#finishEarly').addEventListener('click', () => {
     const left = s.entries.filter(en => !en.done).length;
@@ -283,7 +397,11 @@ async function renderSessionExercise(id, eiRaw){
   const en = s.entries[ei];
   if (!en) { location.hash = '#/session/' + s.id; return; }
   const day = routine.days.find(d => d.id === s.dayId);
-  const meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
+  let meta = day ? (day.exercises.find(x => x.id === en.exerciseId) || day.exercises.find(x => x.name === en.name)) : null;
+  if (!meta && en.step === 'abs') {
+    const p = ((routine.absPool && routine.absPool.length) ? routine.absPool : DEFAULT_ABS_POOL).find(x => x.name === en.name);
+    if (p) meta = { group: 'Abdominales', grip: '', sets: p.sets || 3, repsTarget: p.repsTarget || '10-15', restSec: settings.restSec, url: p.url || '', variants: ['Con peso', 'Sin peso', 'Con banda'] };
+  }
   const others = (await getAllSessions()).filter(x => x.id !== s.id).sort(byDateDesc);
   const prev = findPrev(others, en.name, en.variant || null);
   const isTime = en.type === 'time';
@@ -527,6 +645,7 @@ async function renderProgress(){
   const sessions = (await getAllSessions()).sort(byDateAsc);
   const names = [];
   routine.days.forEach(d => d.exercises.forEach(x => { if (!names.includes(x.name)) names.push(x.name); }));
+  (routine.absPool || []).forEach(p => { if (!names.includes(p.name)) names.push(p.name); });
   sessions.forEach(s => s.entries.forEach(en => { if (!names.includes(en.name)) names.push(en.name); }));
   if (!names.length) { setView('<h1 class="apptitle">Progresión</h1><p class="empty">No hay ejercicios.</p>'); return; }
   const sel = names.includes(progressSel) ? progressSel : names[0];
@@ -675,8 +794,17 @@ function validateRoutine(obj){
       : [];
     return { id: typeof d.id === 'string' ? d.id : uid(), name: String(d.name || `Día ${di + 1}`), exercises, stretches };
   }).filter(Boolean);
+  const absPool = Array.isArray(obj.absPool)
+    ? obj.absPool.filter(p => p && p.name).map(p => ({
+        name: String(p.name),
+        type: p.type === 'time' ? 'time' : 'reps',
+        sets: Number.isInteger(Number(p.sets)) && Number(p.sets) > 0 ? Math.min(20, Number(p.sets)) : 3,
+        repsTarget: strOr(p.repsTarget) || '10-15',
+        url: strOr(p.url)
+      }))
+    : null;
   if (errors.length) return { ok: false, errors };
-  return { ok: true, routine: { version: 1, days } };
+  return { ok: true, routine: { version: 1, days, absPool: (absPool && absPool.length) ? absPool : DEFAULT_ABS_POOL } };
 }
 
 async function onImportFile(e){
@@ -899,12 +1027,34 @@ async function migrate(){
   await setKV('migr-noplank', 1, true);
 }
 
+async function migrateV3(){
+  // v3: días sin número ("Día 1 - Pecho..." -> "Pecho..."), los abdominales salen
+  // de las listas de los días (ahora son el paso a. de cada sesión) y se agrega
+  // el pool de abdominales elegibles.
+  if (await getKV('migr-v3')) return;
+  let changed = false;
+  routine.days.forEach(d => {
+    const nn = String(d.name || '').replace(/^\s*d[ií]a\s*\d+\s*[-–—:]\s*/i, '');
+    if (nn && nn !== d.name) { d.name = nn; changed = true; }
+    const before = d.exercises.length;
+    d.exercises = d.exercises.filter(x => !/abdomin/i.test(x.group || ''));
+    if (d.exercises.length !== before) changed = true;
+  });
+  if (!Array.isArray(routine.absPool) || !routine.absPool.length) {
+    routine.absPool = DEFAULT_ABS_POOL;
+    changed = true;
+  }
+  if (changed) await setKV('routine', routine, true);
+  await setKV('migr-v3', 1, true);
+}
+
 async function main(){
   await initDB();
   const r = await getKV('routine');
   if (r) routine = r;
   else { routine = DEFAULT_ROUTINE; await setKV('routine', routine, true); } // seed: sin sello de edición
   await migrate();
+  await migrateV3();
   settings = Object.assign({ unit: 'kg', restSec: 100 }, (await getKV('settings')) || {});
   window.addEventListener('hashchange', route);
   route();

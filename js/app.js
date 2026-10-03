@@ -159,9 +159,22 @@ function setRowHTML(ei, si, t){
     <span class="set-n">${si + 1}</span>
     <input class="in-w" type="number" inputmode="decimal" step="any" min="0" placeholder="0" value="${w}">
     <input class="in-r" type="number" inputmode="numeric" step="1" min="0" placeholder="0" value="${r}">
-    <button class="btn-timer" title="Arrancar descanso">⏱</button>
+    <button class="btn-timer${t.rest ? ' rested' : ''}" title="${t.rest ? 'Descanso cumplido — tocá para repetirlo' : 'Arrancar descanso'}">${t.rest ? '✓' : '⏱'}</button>
   </div>`;
 }
+
+// El timer avisa acá cuando el descanso de una serie se cumple (o se salta):
+// marcamos la serie con ✓, en la sesión y en pantalla si está visible.
+let liveSession = null;
+window.onRestDone = async ctx => {
+  if (!ctx || !ctx.sid) return;
+  const s = (liveSession && liveSession.id === ctx.sid) ? liveSession : await getSession(ctx.sid);
+  if (!s || !s.entries[ctx.ei] || !s.entries[ctx.ei].sets[ctx.si]) return;
+  s.entries[ctx.ei].sets[ctx.si].rest = 1;
+  await putSession(s);
+  const btn = document.querySelector(`.set-row[data-ei="${ctx.ei}"][data-si="${ctx.si}"] .btn-timer`);
+  if (btn) { btn.textContent = '✓'; btn.classList.add('rested'); btn.title = 'Descanso cumplido — tocá para repetirlo'; }
+};
 
 function setsSummary(en){
   const sets = en.sets.filter(t => t.w != null || t.r != null);
@@ -178,6 +191,7 @@ async function renderSession(id){
   setNav('home');
   const s = await getSession(id);
   if (!s) { toast('No se encontró la sesión'); location.hash = '#/home'; return; }
+  liveSession = s;
   const day = routine.days.find(d => d.id === s.dayId);
   const others = (await getAllSessions()).filter(x => x.id !== s.id).sort(byDateDesc);
   const isDone = s.status === 'done';
@@ -393,6 +407,7 @@ async function renderSessionExercise(id, eiRaw){
   setNav('home');
   const s = await getSession(id);
   if (!s) { toast('No se encontró la sesión'); location.hash = '#/home'; return; }
+  liveSession = s;
   const ei = parseInt(eiRaw, 10);
   const en = s.entries[ei];
   if (!en) { location.hash = '#/session/' + s.id; return; }
@@ -481,8 +496,14 @@ async function renderSessionExercise(id, eiRaw){
       save();
       return;
     }
-    if (e.target.closest('.btn-timer')) {
-      Timer.start((meta && meta.restSec) || settings.restSec);
+    const tbtn = e.target.closest('.btn-timer');
+    if (tbtn) {
+      // tocar el ✓ vuelve a arrancar el descanso para esa serie
+      const si = +tbtn.closest('.set-row').dataset.si;
+      if (en.sets[si]) en.sets[si].rest = 0;
+      tbtn.textContent = '⏱'; tbtn.classList.remove('rested'); tbtn.title = 'Descanso en curso';
+      save();
+      Timer.start((meta && meta.restSec) || settings.restSec, { ctx: { sid: s.id, ei, si } });
       return;
     }
     if (e.target.closest('.add-set')) {

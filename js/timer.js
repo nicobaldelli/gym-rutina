@@ -54,11 +54,13 @@ const Timer = (() => {
     u.bar.style.width = ((u.inline ? 1 - pct : pct) * 100) + '%';
   }
 
-  // opts: { label: 'Corriendo 🏃', done: '¡Calentamiento listo!' } — por defecto es un descanso
+  // opts: { label, done, ctx } — ctx identifica a qué serie pertenece el descanso,
+  // para marcarla con ✓ cuando se completa (sobrevive a recargas en localStorage).
   function start(sec, opts){
     save({
       endTs: Date.now() + sec * 1000, total: sec,
-      label: (opts && opts.label) || '', done: (opts && opts.done) || ''
+      label: (opts && opts.label) || '', done: (opts && opts.done) || '',
+      ctx: (opts && opts.ctx) || null
     });
     show(); loop();
   }
@@ -70,7 +72,14 @@ const Timer = (() => {
     save(st); update();
   }
 
-  function skip(){ save(null); stopLoop(); hide(); }
+  function ctxDone(st){
+    if (st && st.ctx && typeof window.onRestDone === 'function') {
+      try { window.onRestDone(st.ctx); } catch (e) {}
+    }
+  }
+
+  // saltar también cuenta como descanso cumplido para la serie
+  function skip(){ const st = load(); save(null); stopLoop(); hide(); ctxDone(st); }
 
   function finish(st){
     st = st || {};
@@ -83,6 +92,7 @@ const Timer = (() => {
     if (navigator.vibrate) { try { navigator.vibrate([300, 120, 300, 120, 600]); } catch (e) {} }
     beep(); notify(st);
     if (typeof toast === 'function') toast('⏱ ' + doneMsg, 3500);
+    ctxDone(st);
     setTimeout(hide, 4000);
   }
 

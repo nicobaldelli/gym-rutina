@@ -98,6 +98,7 @@ input[type=date]{background:var(--card2);border:1px solid var(--line);color:var(
 .set-row input{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:13px 6px;font-size:20px;text-align:center}
 .set-row input:focus{outline:2px solid var(--accent);border-color:transparent}
 .btn-timer{font-size:22px;padding:9px 0;border:1px solid var(--line);border-radius:10px;background:var(--card2)}
+.btn-timer.rested{border-color:rgba(61,220,133,.55);color:var(--ok);font-weight:800}
 .add-set{margin-top:6px}
 .session-actions{margin:16px 0}
 .savehint{color:var(--ok);text-align:center;font-size:14px;min-height:20px}

@@ -243,16 +243,23 @@ async function renderSession(id){
 
   // --- paso b: entrada en calor ---
   if (step === 'warm') {
+    const machine = settings.warmupMode === 'machine';
     html += `<div class="section-label">b. Entrada en calor</div>
       <div class="card">
         <div class="ex-name">🏃 5 minutos de correr</div>
-        <div class="card-sub">Ritmo suave, cinta o afuera. Arrancá el reloj o marcalo cuando termines.</div>
-        <div id="restInline" class="rest-inline" hidden>
+        <div class="variants">
+          <button class="chip${machine ? '' : ' on'}" data-warmmode="timer">Con reloj acá</button>
+          <button class="chip${machine ? ' on' : ''}" data-warmmode="machine">En cinta (sin reloj)</button>
+        </div>
+        <div class="card-sub">${machine
+          ? 'La cinta ya te marca el tiempo: marcá acá cuando termines.'
+          : 'Ritmo suave. Arrancá el reloj o marcalo cuando termines.'}</div>
+        ${machine ? '' : `<div id="restInline" class="rest-inline" hidden>
           <div class="rest-top"><span id="riLabel">Corriendo</span><b id="riTime">5:00</b></div>
           <div class="rest-track"><div id="riBar"></div></div>
           <div class="rest-btns"><button id="riMinus">−15s</button><button id="riPlus">+15s</button><button id="riSkip">Parar</button></div>
         </div>
-        <button id="warmStart" class="btn-ghost">▶ Arrancar 5:00</button>
+        <button id="warmStart" class="btn-ghost">▶ Arrancar 5:00</button>`}
         <button id="warmDoneBtn" class="btn-primary">✓ Terminé el calentamiento</button>
       </div>`;
   }
@@ -342,6 +349,13 @@ async function renderSession(id){
   });
 
   // paso b: calentamiento
+  root.querySelectorAll('[data-warmmode]').forEach(b => b.addEventListener('click', async () => {
+    if (settings.warmupMode === b.dataset.warmmode) return;
+    settings.warmupMode = b.dataset.warmmode; // se acuerda para la próxima
+    if (b.dataset.warmmode === 'machine') Timer.skip();
+    await setKV('settings', settings);
+    renderSession(id);
+  }));
   if (q('#warmStart')) q('#warmStart').addEventListener('click', () =>
     Timer.start(300, { label: 'Corriendo 🏃', done: '¡Calentamiento listo!' }));
   if (q('#warmDoneBtn')) q('#warmDoneBtn').addEventListener('click', async () => {

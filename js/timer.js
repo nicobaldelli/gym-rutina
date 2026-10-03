@@ -44,18 +44,22 @@ const Timer = (() => {
     const st = load();
     if (!st) { stopLoop(); hide(); return; }
     const rem = Math.ceil((st.endTs - Date.now()) / 1000);
-    if (rem <= 0) { finish(); return; }
+    if (rem <= 0) { finish(st); return; }
     const u = ui();
     if (u.inline ? u.box.hidden : !u.box.classList.contains('show')) show();
-    u.label.textContent = 'Descanso';
+    u.label.textContent = st.label || 'Descanso';
     u.time.textContent = fmt(rem);
     const pct = Math.max(0, Math.min(1, rem / st.total));
     // inline: barra que se va llenando; overlay: barra que se vacía
     u.bar.style.width = ((u.inline ? 1 - pct : pct) * 100) + '%';
   }
 
-  function start(sec){
-    save({ endTs: Date.now() + sec * 1000, total: sec });
+  // opts: { label: 'Corriendo 🏃', done: '¡Calentamiento listo!' } — por defecto es un descanso
+  function start(sec, opts){
+    save({
+      endTs: Date.now() + sec * 1000, total: sec,
+      label: (opts && opts.label) || '', done: (opts && opts.done) || ''
+    });
     show(); loop();
   }
 
@@ -68,15 +72,17 @@ const Timer = (() => {
 
   function skip(){ save(null); stopLoop(); hide(); }
 
-  function finish(){
+  function finish(st){
+    st = st || {};
+    const doneMsg = st.done || '¡Descanso terminado! Siguiente serie 💪';
     save(null); stopLoop();
     const u = ui();
     u.time.textContent = '0:00';
-    u.label.textContent = '¡Descanso terminado!';
+    u.label.textContent = st.done || '¡Descanso terminado!';
     u.bar.style.width = u.inline ? '100%' : '0%';
     if (navigator.vibrate) { try { navigator.vibrate([300, 120, 300, 120, 600]); } catch (e) {} }
-    beep(); notify();
-    if (typeof toast === 'function') toast('⏱ ¡Descanso terminado! Siguiente serie 💪', 3500);
+    beep(); notify(st);
+    if (typeof toast === 'function') toast('⏱ ' + doneMsg, 3500);
     setTimeout(hide, 4000);
   }
 
@@ -96,10 +102,10 @@ const Timer = (() => {
     } catch (e) {}
   }
 
-  function notify(){
+  function notify(st){
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const title = '⏱ Descanso terminado';
-    const opts = { body: '¡Siguiente serie!', tag: 'gym-timer', icon: 'icons/icon-192.png' };
+    const title = '⏱ ' + ((st && st.done) || 'Descanso terminado');
+    const opts = { body: (st && st.done) ? '¡A seguir!' : '¡Siguiente serie!', tag: 'gym-timer', icon: 'icons/icon-192.png' };
     // En Android, Notification() directo desde la página tira error: usar el SW.
     if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
       navigator.serviceWorker.getRegistration().then(reg => {

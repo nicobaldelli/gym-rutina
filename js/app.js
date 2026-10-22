@@ -294,14 +294,18 @@ async function renderSession(id){
     }
   }
 
-  // --- paso d: elongación (al confirmarla se guarda la sesión automáticamente) ---
+  // --- paso d: elongación: un tilde por estiramiento; al marcar el último
+  // la sesión se guarda sola ---
   if (step === 'stretch') {
     if (stretches.length && !s.stretchesDone) {
-      html += `<div class="section-label">${flow2 ? 'd. ' : ''}Elongación post-entreno</div><div class="card">` +
-        stretches.map(x => `<div class="stretch-item">${stretchMediaHTML(x)}
-          <div class="stretch-info">${esc(x.name)}${x.url ? `<br><a href="${esc(x.url)}" target="_blank" rel="noopener">ver más ↗</a>` : ''}</div></div>`).join('') +
-        `<button id="stretchDone" class="btn-primary">✓ Terminé la elongación — guardar sesión</button>
-        <button id="stretchSkip" class="btn-ghost">Saltar elongación y guardar</button></div>`;
+      const ticks = s.stretchTicks || {};
+      const nDone = stretches.filter((_, i) => ticks[i]).length;
+      html += `<div class="section-label">${flow2 ? 'd. ' : ''}Elongación — tildá cada una al terminarla (${nDone}/${stretches.length})</div><div class="card">` +
+        stretches.map((x, i) => `<div class="stretch-item${ticks[i] ? ' done' : ''}">${stretchMediaHTML(x)}
+          <div class="stretch-info">${esc(x.name)}${x.url ? `<br><a href="${esc(x.url)}" target="_blank" rel="noopener">ver más ↗</a>` : ''}</div>
+          <button class="stretch-tick${ticks[i] ? ' on' : ''}" data-st="${i}" title="${ticks[i] ? 'Hecha — tocá para desmarcar' : 'Marcar como hecha'}">${ticks[i] ? '✓' : ''}</button></div>`).join('') +
+        `<div class="card-sub">Al tildar la última, la sesión se guarda sola.</div>
+        <button id="stretchSkip" class="btn-ghost">Saltar lo que falta y guardar sesión</button></div>`;
     } else {
       html += `<div class="card"><div class="ex-name">🎉 ¡Día completo!</div>
         <div class="card-sub">${s.stretchesDone ? 'Ejercicios y elongación listos.' : 'Todos los ejercicios listos.'} Confirmá para guardar la sesión.</div>
@@ -380,13 +384,24 @@ async function renderSession(id){
     renderSession(id); // pasa solo al paso c
   });
 
-  // paso d: confirmar la elongación guarda la sesión automáticamente
-  const markStretch = async () => {
+  // paso d: tilde por estiramiento; el último tilde (o saltar) guarda la sesión
+  root.querySelectorAll('.stretch-tick').forEach(b => b.addEventListener('click', async () => {
+    const i = +b.dataset.st;
+    s.stretchTicks = s.stretchTicks || {};
+    if (s.stretchTicks[i]) delete s.stretchTicks[i];
+    else s.stretchTicks[i] = 1;
+    if (stretches.length && stretches.every((_, j) => s.stretchTicks[j])) {
+      s.stretchesDone = true;
+      await finish();
+      return;
+    }
+    await putSession(s);
+    renderSession(id);
+  }));
+  if (q('#stretchSkip')) q('#stretchSkip').addEventListener('click', async () => {
     s.stretchesDone = true;
     await finish();
-  };
-  if (q('#stretchDone')) q('#stretchDone').addEventListener('click', markStretch);
-  if (q('#stretchSkip')) q('#stretchSkip').addEventListener('click', markStretch);
+  });
   if (q('#finishBtn')) q('#finishBtn').addEventListener('click', finish);
   if (q('#finishEarly')) q('#finishEarly').addEventListener('click', () => {
     const left = s.entries.filter(en => !en.done).length;
@@ -960,13 +975,14 @@ function syncCardHTML(){
       error: '⚠️ ' + (st.lastError || 'Error')
     }[st.state] || st.state;
     inner = `<div class="card-sub">${esc(txt)}</div>`;
+    if (st.builtin) inner += `<div class="card-sub">🔒 La configuración está grabada en la app: no se pierde aunque borres cookies o datos del sitio.</div>`;
     if (st.email) {
       inner += `<button id="sy-now" class="btn-ghost">🔄 Sincronizar ahora</button>
         <button id="sy-out" class="btn-ghost">Cerrar sesión</button>`;
     } else if (st.state !== 'loading') {
       inner += `<button id="sy-login" class="btn-primary">Iniciar sesión con Google</button>`;
     }
-    inner += `<button id="sy-del" class="btn-danger">Quitar configuración de este dispositivo</button>`;
+    if (!st.builtin) inner += `<button id="sy-del" class="btn-danger">Quitar configuración de este dispositivo</button>`;
   }
   return `<div class="card form"><div class="ex-name">☁️ Sincronización</div>${inner}</div>`;
 }

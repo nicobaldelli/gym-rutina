@@ -8,13 +8,34 @@ const Sync = window.Sync = (() => {
   const LS_CFG = 'gym.sync.cfg';
   const LS_DEL = 'gym.sync.pendingDel';
   const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+
+  /* Config fija de la app (opcional pero recomendado): pegá acá tu objeto
+     firebaseConfig y la sincronización queda grabada en el código — sobrevive
+     a borrar cookies/datos del sitio (solo hay que volver a iniciar sesión).
+     NO es un secreto: es un identificador público del proyecto; la seguridad
+     la dan las reglas de Firestore y el login de Google. */
+  const BUILTIN_CFG = {
+    apiKey: 'AIzaSyB_ElRwNS06-wRodbLCZzrWjzMKbIHStV0',
+    authDomain: 'gymrutina-1d9bc.firebaseapp.com',
+    projectId: 'gymrutina-1d9bc',
+    storageBucket: 'gymrutina-1d9bc.firebasestorage.app',
+    messagingSenderId: '416115738459',
+    appId: '1:416115738459:web:07f91a7a905987d2853c7e'
+  };
+
   let auth = null, fs = null;
   let state = 'off'; // off | loading | signedout | syncing | ok | error
   let lastError = '', syncing = false, pushTimer = null, kvDirty = false;
   const listeners = [];
   const pendingPut = new Map(); // sesiones editadas esperando subir
 
-  function getConfig(){ try { return JSON.parse(localStorage.getItem(LS_CFG)); } catch (e) { return null; } }
+  function getConfig(){
+    try {
+      const v = JSON.parse(localStorage.getItem(LS_CFG));
+      if (v) return v;
+    } catch (e) {}
+    return BUILTIN_CFG;
+  }
   function loadDel(){ try { return JSON.parse(localStorage.getItem(LS_DEL)) || {}; } catch (e) { return {}; } }
   function saveDel(m){ localStorage.setItem(LS_DEL, JSON.stringify(m)); }
 
@@ -24,6 +45,7 @@ const Sync = window.Sync = (() => {
     return {
       state, lastError,
       configured: !!getConfig(),
+      builtin: !!BUILTIN_CFG,
       email: auth && auth.currentUser ? (auth.currentUser.email || auth.currentUser.uid) : null
     };
   }
@@ -72,6 +94,7 @@ const Sync = window.Sync = (() => {
     localStorage.removeItem(LS_CFG);
     localStorage.removeItem(LS_DEL);
     state = 'off'; lastError = ''; emit();
+    if (BUILTIN_CFG) init(); // la config grabada en la app sigue activa
   }
 
   async function signIn(){

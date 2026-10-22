@@ -91,6 +91,8 @@ Por defecto todo vive en el dispositivo. Si querés el mismo historial en el cel
 
 Cómo sincroniza: sigue siendo offline-first — todo se guarda local al instante y se sube cuando hay conexión (al abrir la app, después de cada cambio, o con "Sincronizar ahora"). Si el mismo dato se editó en dos lados, gana la última edición. Los borrados también se propagan.
 
+> **Tip — que la config no se pierda**: pegando tu objeto `firebaseConfig` en la constante `BUILTIN_CFG` de `js/sync.js`, la configuración queda grabada en la app y sobrevive a borrar cookies/datos del sitio (solo hay que volver a iniciar sesión con Google). Es seguro aunque el repo sea público: el `firebaseConfig` no es un secreto — identifica al proyecto, y la protección real son las reglas de Firestore y el login. Como refuerzo opcional, en Google Cloud (APIs y servicios → Credenciales) podés restringir la API key a tu dominio `TU_USUARIO.github.io/*`.
+
 ## Esquema JSON para importar la rutina
 
 Desde **Rutina → Importar rutina (JSON)**. El archivo se valida y se muestra una vista previa antes de reemplazar la rutina actual (el historial no se toca).

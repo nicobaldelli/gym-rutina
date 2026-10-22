@@ -975,13 +975,14 @@ function syncCardHTML(){
       error: '⚠️ ' + (st.lastError || 'Error')
     }[st.state] || st.state;
     inner = `<div class="card-sub">${esc(txt)}</div>`;
+    if (st.builtin) inner += `<div class="card-sub">🔒 La configuración está grabada en la app: no se pierde aunque borres cookies o datos del sitio.</div>`;
     if (st.email) {
       inner += `<button id="sy-now" class="btn-ghost">🔄 Sincronizar ahora</button>
         <button id="sy-out" class="btn-ghost">Cerrar sesión</button>`;
     } else if (st.state !== 'loading') {
       inner += `<button id="sy-login" class="btn-primary">Iniciar sesión con Google</button>`;
     }
-    inner += `<button id="sy-del" class="btn-danger">Quitar configuración de este dispositivo</button>`;
+    if (!st.builtin) inner += `<button id="sy-del" class="btn-danger">Quitar configuración de este dispositivo</button>`;
   }
   return `<div class="card form"><div class="ex-name">☁️ Sincronización</div>${inner}</div>`;
 }

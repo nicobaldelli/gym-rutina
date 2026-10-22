@@ -13,9 +13,15 @@ const Sync = window.Sync = (() => {
      firebaseConfig y la sincronización queda grabada en el código — sobrevive
      a borrar cookies/datos del sitio (solo hay que volver a iniciar sesión).
      NO es un secreto: es un identificador público del proyecto; la seguridad
-     la dan las reglas de Firestore y el login de Google.
-     Ejemplo: const BUILTIN_CFG = { apiKey: '...', authDomain: '...', projectId: '...', ... }; */
-  const BUILTIN_CFG = null;
+     la dan las reglas de Firestore y el login de Google. */
+  const BUILTIN_CFG = {
+    apiKey: 'AIzaSyB_ElRwNS06-wRodbLCZzrWjzMKbIHStV0',
+    authDomain: 'gymrutina-1d9bc.firebaseapp.com',
+    projectId: 'gymrutina-1d9bc',
+    storageBucket: 'gymrutina-1d9bc.firebasestorage.app',
+    messagingSenderId: '416115738459',
+    appId: '1:416115738459:web:07f91a7a905987d2853c7e'
+  };
 
   let auth = null, fs = null;
   let state = 'off'; // off | loading | signedout | syncing | ok | error
